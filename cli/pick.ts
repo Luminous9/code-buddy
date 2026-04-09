@@ -9,7 +9,7 @@
  *  Results: matched buddies     │  preview of highlighted
  *  Naming:  name + save prompt  │  card with live name
  *
- * Keys — Saved:    ↑↓ navigate  [enter] summon  [s] search  [q] quit
+ * Keys — Saved:    ↑↓ navigate  [enter] summon  [r] random  [s] search  [q] quit
  * Keys — Criteria: ↑↓ field     ←→ value        [enter] run  [esc] back
  * Keys — Results:  ↑↓ navigate  [enter] pick     [esc] back  [q] quit
  * Keys — Naming:   type name    [enter] save      [esc] cancel
@@ -134,7 +134,7 @@ function savedPane(s: State): string[] {
   }
 
   lines.push(GR + "  " + "─".repeat(LEFT_W - 2) + N);
-  lines.push(`  ${GR}↑↓ navigate  enter summon  q quit${N}`);
+  lines.push(`  ${GR}↑↓ navigate  enter summon  r random  s search  q quit${N}`);
   return lines;
 }
 
@@ -360,7 +360,17 @@ function onKey(key: string, s: State): boolean {
       if (key === "s")                          { s.mode = "criteria"; break; }
       if (key === "\x1b[A" || key === "k")      s.savedCursor = clamp(s.savedCursor - 1, 0, s.savedSlots.length - 1);
       else if (key === "\x1b[B" || key === "j") s.savedCursor = clamp(s.savedCursor + 1, 0, s.savedSlots.length - 1);
-      else if (key === "\r" || key === "\n") {
+      else if (key === "r") {
+        // Random pick from menagerie
+        if (s.savedSlots.length > 0) {
+          const entry = s.savedSlots[Math.floor(Math.random() * s.savedSlots.length)];
+          s.savedCursor = s.savedSlots.indexOf(entry);
+          saveActiveSlot(entry.slot);
+          writeStatusState(entry.companion, `*${entry.companion.name} arrives*`);
+          s.message = `✓ ${entry.companion.name} summoned at random!`;
+          return true;
+        }
+      } else if (key === "\r" || key === "\n") {
         const entry = s.savedSlots[s.savedCursor];
         if (entry) {
           saveActiveSlot(entry.slot);

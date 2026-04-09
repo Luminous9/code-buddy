@@ -22,7 +22,8 @@ Based on `$ARGUMENTS`:
 | `on` | Call `buddy_unmute` |
 | `rename <name>` | Call `buddy_rename` with the given name |
 | `personality <text>` | Call `buddy_set_personality` with the given text |
-| `summon [slot]` | Call `buddy_summon` with optional slot name (random if omitted) |
+| `summon` | Call `buddy_summon` with no args — picks a random saved buddy |
+| `summon <slot>` | Call `buddy_summon` with the given slot name |
 | `save [slot]` | Call `buddy_save` with optional slot name |
 | `list` | Call `buddy_list` |
 | `dismiss <slot>` | Call `buddy_dismiss` with the slot name |
