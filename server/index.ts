@@ -465,7 +465,7 @@ server.tool(
 server.resource(
   "buddy_companion",
   "buddy://companion",
-  "Current companion data as JSON",
+  { description: "Current companion data as JSON", mimeType: "application/json" },
   async () => {
     const companion = ensureCompanion();
     return {
@@ -483,7 +483,7 @@ server.resource(
 server.resource(
   "buddy_prompt",
   "buddy://prompt",
-  "System prompt context for the companion",
+  { description: "System prompt context for the companion", mimeType: "text/markdown" },
   async () => {
     const companion = ensureCompanion();
     const prompt = [

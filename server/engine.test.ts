@@ -208,6 +208,87 @@ describe("generateBones", () => {
     }
     expect(signatures.size).toBeGreaterThan(1);
   });
+
+  // ─── Golden snapshots ──────────────────────────────────────────────────
+  //
+  // These lock down the exact bones for specific user IDs. They exist to
+  // catch *any* unintended change to the generation algorithm — wyhash,
+  // mulberry32, the rarity table, the hat/eye/species pool ordering, the
+  // stat formulas, or the salt. If one of these tests fails, stop and ask
+  // "did I mean to change what every existing user's buddy looks like?"
+  //
+  // The whole point of claude-buddy is that the same user always gets the
+  // same companion, forever. That's only true if these stay green.
+
+  test("golden snapshot: 'golden-user-alpha' (common ghost)", () => {
+    expect(generateBones("golden-user-alpha")).toEqual({
+      rarity: "common",
+      species: "ghost",
+      eye: "\u00b7",
+      hat: "none",
+      shiny: false,
+      stats: {
+        DEBUGGING: 23,
+        PATIENCE: 22,
+        CHAOS: 9,
+        WISDOM: 32,
+        SNARK: 59,
+      },
+      peak: "SNARK",
+      dump: "CHAOS",
+    });
+  });
+
+  test("golden snapshot: 'golden-user-beta' (common rabbit)", () => {
+    expect(generateBones("golden-user-beta")).toEqual({
+      rarity: "common",
+      species: "rabbit",
+      eye: "@",
+      hat: "none",
+      shiny: false,
+      stats: {
+        DEBUGGING: 3,
+        PATIENCE: 77,
+        CHAOS: 40,
+        WISDOM: 33,
+        SNARK: 5,
+      },
+      peak: "PATIENCE",
+      dump: "DEBUGGING",
+    });
+  });
+
+  test("golden snapshot: 'legendary-seed-1' (uncommon axolotl)", () => {
+    // This one is picked because it exercises the non-common rarity branch
+    // where hat is drawn from HATS (even though the result still lands on
+    // 'none', which is the first hat in the list).
+    expect(generateBones("legendary-seed-1")).toEqual({
+      rarity: "uncommon",
+      species: "axolotl",
+      eye: "\u25c9",
+      hat: "none",
+      shiny: false,
+      stats: {
+        DEBUGGING: 11,
+        PATIENCE: 16,
+        CHAOS: 20,
+        WISDOM: 49,
+        SNARK: 76,
+      },
+      peak: "SNARK",
+      dump: "DEBUGGING",
+    });
+  });
+
+  test("golden snapshot with custom salt is isolated from the default", () => {
+    // Using a custom salt should NOT match the default-salt result for the
+    // same user ID (and should itself be deterministic).
+    const defaultSalt = generateBones("golden-user-alpha");
+    const customA = generateBones("golden-user-alpha", "custom-salt-v1");
+    const customB = generateBones("golden-user-alpha", "custom-salt-v1");
+    expect(customA).toEqual(customB);
+    expect(customA).not.toEqual(defaultSalt);
+  });
 });
 
 // ─── renderFace ────────────────────────────────────────────────────────────
