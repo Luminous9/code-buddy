@@ -16,9 +16,6 @@
         "terminal-pet",
         "tamagotchi"
     ],
-    "skills": [
-        "buddy"
-    ],
     "hooks": "./hooks/hooks.json",
     "mcpServers": {
         "claude-buddy": {
@@ -28,11 +25,5 @@
                 "server/index.ts"
             ]
         }
-    },
-    "statusLine": {
-        "type": "command",
-        "command": "./statusline/buddy-status.sh",
-        "padding": 1,
-        "refreshInterval": 1
     }
 }
