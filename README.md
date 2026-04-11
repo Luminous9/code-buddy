@@ -357,6 +357,29 @@ bun run cli/uninstall.ts
 # Then re-add your previous statusLine block manually
 ```
 
+### SessionStart hook error after switching from tmux
+
+If you previously installed with tmux and now start Claude Code without it, you may see:
+
+```
+SessionStart:startup hook error
+TMUX_PANE: unbound variable
+```
+
+Fix: re-run the installer outside of tmux to reconfigure for status line mode:
+
+```bash
+bun run install-buddy
+```
+
+If the error persists, manually remove the leftover tmux hooks:
+
+```bash
+jq 'del(.hooks.SessionStart, .hooks.SessionEnd)' \
+  ~/.claude/settings.json > /tmp/s.json && \
+  mv /tmp/s.json ~/.claude/settings.json
+```
+
 ### Recovery from a broken state
 
 Always available:
