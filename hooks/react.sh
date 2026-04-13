@@ -11,6 +11,7 @@ STATE_DIR="$BUDDY_STATE_DIR"
 STATUS_FILE="$STATE_DIR/status.json"
 CONFIG_FILE="$STATE_DIR/config.json"
 EVENTS_FILE="$STATE_DIR/events.json"
+WALLET_FILE="$STATE_DIR/wallet.json"
 
 [ -f "$STATUS_FILE" ] || exit 0
 
@@ -209,6 +210,21 @@ if [ -n "$REASON" ] && [ -n "$REACTION" ]; then
         if [ -n "$KEY" ]; then
             TMP=$(mktemp)
             jq --arg k "$KEY" 'if .[$k] then .[$k] += 1 else .[$k] = 1 end' "$EVENTS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$EVENTS_FILE"
+        fi
+
+        # Earn coins based on event type
+        COIN_AMT=0
+        case "$REASON" in
+            "test-fail")  COIN_AMT=2 ;;
+            "error")      COIN_AMT=2 ;;
+            "large-diff") COIN_AMT=3 ;;
+        esac
+        if [ "$COIN_AMT" -gt 0 ]; then
+            if [ ! -f "$WALLET_FILE" ]; then
+                echo '{}' > "$WALLET_FILE"
+            fi
+            TMP=$(mktemp)
+            jq --argjson amt "$COIN_AMT" '.coins = ((.coins // 0) + $amt) | .totalEarned = ((.totalEarned // 0) + $amt)' "$WALLET_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$WALLET_FILE"
         fi
     fi
 fi

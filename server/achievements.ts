@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "fs";
 import { join } from "path";
 import { buddyStateDir } from "./path.ts";
+import { earnCoins } from "./wallet.ts";
 
 const STATE_DIR = buddyStateDir();
 const EVENTS_FILE = join(STATE_DIR, "events.json");
@@ -43,6 +44,9 @@ export interface GlobalCounters {
   commands_run: number;
   days_active: number;
   turns: number;
+  pulls_total: number;
+  legendary_pulls: number;
+  shiny_pulls: number;
 }
 
 // ─── Event counters (per-slot) ────────────────────────────────────────────────
@@ -62,6 +66,7 @@ export interface EventCounters extends GlobalCounters {
 export const GLOBAL_KEYS: (keyof GlobalCounters)[] = [
   "errors_seen", "tests_failed", "large_diffs",
   "sessions", "commands_run", "days_active", "turns",
+  "pulls_total", "legendary_pulls", "shiny_pulls",
 ];
 
 export const SLOT_KEYS: (keyof SlotCounters)[] = [
@@ -71,11 +76,13 @@ export const SLOT_KEYS: (keyof SlotCounters)[] = [
 export const COUNTER_KEYS: (keyof EventCounters)[] = [
   "errors_seen", "tests_failed", "large_diffs", "turns", "pets",
   "sessions", "reactions_given", "commands_run", "days_active",
+  "pulls_total", "legendary_pulls", "shiny_pulls",
 ];
 
 const EMPTY_GLOBAL: GlobalCounters = {
   errors_seen: 0, tests_failed: 0, large_diffs: 0,
   sessions: 0, commands_run: 0, days_active: 0, turns: 0,
+  pulls_total: 0, legendary_pulls: 0, shiny_pulls: 0,
 };
 
 const EMPTY_SLOT: SlotCounters = {
@@ -167,6 +174,8 @@ export function trackActiveDay(): void {
   const events = loadGlobalEvents();
   events.days_active = tracker.totalDays;
   saveGlobalEvents(events);
+
+  earnCoins(10); // daily login bonus
 }
 
 // ─── Achievement definitions ─────────────────────────────────────────────────
@@ -307,6 +316,46 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Reach 1000 turns together",
     icon: "\ud83c\udf96",
     check: (e) => e.turns >= 1000,
+    secret: true,
+  },
+  {
+    id: "first_pull",
+    name: "First Pull",
+    description: "Complete your first gacha pull",
+    icon: "\ud83c\udfb0",
+    check: (e) => e.pulls_total >= 1,
+    secret: false,
+  },
+  {
+    id: "high_roller",
+    name: "High Roller",
+    description: "Complete 25 gacha pulls",
+    icon: "\ud83d\udcb0",
+    check: (e) => e.pulls_total >= 25,
+    secret: false,
+  },
+  {
+    id: "whale",
+    name: "Whale",
+    description: "Complete 100 gacha pulls",
+    icon: "\ud83d\udc0b",
+    check: (e) => e.pulls_total >= 100,
+    secret: true,
+  },
+  {
+    id: "jackpot",
+    name: "Jackpot",
+    description: "Pull a legendary buddy from the gacha",
+    icon: "\ud83c\udf1f",
+    check: (e) => e.legendary_pulls >= 1,
+    secret: false,
+  },
+  {
+    id: "shiny_hunter",
+    name: "Shiny Hunter",
+    description: "Pull a shiny buddy from the gacha",
+    icon: "\ud83d\udc8e",
+    check: (e) => e.shiny_pulls >= 1,
     secret: true,
   },
 ];

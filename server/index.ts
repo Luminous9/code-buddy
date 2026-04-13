@@ -57,6 +57,11 @@ import {
   incrementEvent, checkAndAward, trackActiveDay,
   renderAchievementsCardMarkdown,
 } from "./achievements.ts";
+import {
+  loadWallet, saveWallet, earnCoins, spendCoins, canAfford,
+  PULL_COST, MULTI_PULL_COUNT, MULTI_PULL_COST,
+} from "./wallet.ts";
+import { pullBuddy, updatePity, hatchFlavorText } from "./pull.ts";
 
 function getInstructions(): string {
   const companion = loadCompanion();
@@ -178,6 +183,7 @@ server.tool(
     saveReaction(reaction, "pet");
     writeStatusState(companion, reaction);
     incrementEvent("pets", 1, activeSlot());
+    earnCoins(1);
 
     const face = renderFace(companion.bones.species, companion.bones.eye);
     return {
@@ -326,6 +332,8 @@ server.tool(
       "  /buddy list       List all saved buddies",
       "  /buddy pick       Generate a new random buddy (optional: species, rarity)",
       "  /buddy dismiss    Remove a saved buddy slot",
+      "  /buddy pull       Gacha pull — spend coins to hatch a random buddy",
+      "  /buddy wallet     Check coin balance and pity progress",
       "  /buddy frequency  Show or set comment cooldown (tmux only)",
       "  /buddy style      Show or set bubble style (tmux only)",
       "  /buddy position   Show or set bubble position (tmux only)",
@@ -337,6 +345,7 @@ server.tool(
       "  bun run show            Display buddy in terminal",
       "  bun run pick            Interactive buddy picker",
       "  bun run hunt            Search for specific buddy",
+      "  bun run pull            Gacha pull with egg hatch animation",
       "  bun run doctor          Diagnostic report",
       "  bun run disable         Temporarily deactivate buddy",
       "  bun run enable          Re-enable buddy",
@@ -823,6 +832,150 @@ server.tool(
   },
 );
 
+// ─── Tool: buddy_wallet ─────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_wallet",
+  "Show current coin balance, earning stats, and pity progress for gacha pulls",
+  {},
+  async () => {
+    ensureCompanion();
+    incrementEvent("commands_run", 1, activeSlot());
+    const w = loadWallet();
+
+    const pityEpicPct = Math.floor((w.pityEpic / 50) * 100);
+    const pityLegPct = Math.floor((w.pityLegendary / 100) * 100);
+
+    const parts: string[] = [];
+    parts.push(`### \ud83d\udcb0 Wallet`);
+    parts.push("");
+    parts.push(`**Coins:** ${w.coins}`);
+    parts.push(`**Total earned:** ${w.totalEarned} | **Total spent:** ${w.totalSpent}`);
+    parts.push(`**Pulls completed:** ${w.pullCount}`);
+    parts.push("");
+    parts.push(`**Pull cost:** ${PULL_COST} coins (${MULTI_PULL_COUNT}-pull: ${MULTI_PULL_COST})`);
+    parts.push("");
+    parts.push(`**Pity progress:**`);
+    parts.push(`- Epic guarantee: ${w.pityEpic}/50 (${pityEpicPct}%)`);
+    parts.push(`- Legendary guarantee: ${w.pityLegendary}/100 (${pityLegPct}%)`);
+    parts.push("");
+    parts.push(`*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`);
+
+    return { content: [{ type: "text", text: parts.join("\n") }] };
+  },
+);
+
+// ─── Tool: buddy_pull ───────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_pull",
+  "Spend coins to pull a random buddy from the gacha. Returns a suspenseful egg-hatch reveal followed by the buddy card. Use `! bun run pull` in the terminal for the animated experience.",
+  {
+    count: z.number().int().min(1).max(10).optional().describe(
+      "Number of pulls (1-10). Single pull costs 50 coins, 10-pull costs 450.",
+    ),
+    keep: z.boolean().optional().describe(
+      "If true (default), keep the pulled buddy. If false, discard it after reveal.",
+    ),
+    name: z.string().min(1).max(14).optional().describe(
+      "Name for the pulled buddy. If omitted, a random name is assigned.",
+    ),
+  },
+  async ({ count, keep, name }) => {
+    ensureCompanion();
+    const slot = activeSlot();
+    incrementEvent("commands_run", 1, slot);
+
+    const pullCount = count ?? 1;
+    const totalCost = pullCount === MULTI_PULL_COUNT ? MULTI_PULL_COST
+      : pullCount * PULL_COST;
+
+    if (!canAfford(totalCost)) {
+      const w = loadWallet();
+      return {
+        content: [{
+          type: "text",
+          text: `Not enough coins! You have **${w.coins}** coins but need **${totalCost}** for ${pullCount} pull${pullCount > 1 ? "s" : ""}.\n\n*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`,
+        }],
+      };
+    }
+
+    spendCoins(totalCost);
+    const shouldKeep = keep !== false;
+    const results: string[] = [];
+
+    for (let i = 0; i < pullCount; i++) {
+      let w = loadWallet();
+      const { bones, userId, pityTriggered } = pullBuddy(w);
+
+      // Update pity counters and save
+      w = loadWallet();
+      updatePity(w, bones.rarity);
+      saveWallet(w);
+
+      incrementEvent("pulls_total", 1);
+      if (bones.rarity === "legendary") incrementEvent("legendary_pulls", 1);
+      if (bones.shiny) incrementEvent("shiny_pulls", 1);
+
+      // Build the suspense reveal
+      const flavor = hatchFlavorText(bones.rarity, bones.shiny);
+      const rarityLabel = bones.rarity.toUpperCase();
+
+      const buddyName = (pullCount === 1 && name) ? name : unusedName();
+
+      if (shouldKeep) {
+        const companion: Companion = {
+          bones,
+          name: buddyName,
+          personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
+          hatchedAt: Date.now(),
+          userId,
+        };
+        const buddySlot = slugify(buddyName);
+        if (!loadCompanionSlot(buddySlot)) {
+          saveCompanionSlot(companion, buddySlot);
+        }
+
+        const card = renderCompanionCardMarkdown(
+          bones, buddyName, companion.personality,
+          pityTriggered ? `*${buddyName} hatches* (pity!)` : `*${buddyName} hatches*`,
+        );
+
+        results.push([
+          pullCount > 1 ? `---\n#### Pull ${i + 1}/${pullCount}` : "",
+          flavor,
+          "",
+          `### ${rarityLabel}!`,
+          "",
+          card,
+          pityTriggered ? "\n*Pity system activated!*" : "",
+        ].filter(Boolean).join("\n"));
+      } else {
+        const card = renderCompanionCardMarkdown(
+          bones, buddyName, `A ${bones.rarity} ${bones.species}.`,
+        );
+        results.push([
+          pullCount > 1 ? `---\n#### Pull ${i + 1}/${pullCount}` : "",
+          flavor,
+          "",
+          `### ${rarityLabel}!`,
+          "",
+          card,
+          "\n*Discarded — the buddy vanishes into the mist.*",
+        ].filter(Boolean).join("\n"));
+      }
+    }
+
+    checkAndAward(slot);
+
+    const w = loadWallet();
+    results.push(`\n---\n**Coins remaining:** ${w.coins}`);
+    results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
+
+    return { content: [{ type: "text", text: results.join("\n") }] };
+  },
+);
+
 // ─── Resource: buddy://companion ────────────────────────────────────────────
 
 server.resource(
@@ -899,6 +1052,9 @@ server.resource(
 );
 
 // ─── Start ──────────────────────────────────────────────────────────────────
+
+// Award session coins once per MCP server startup (= once per Claude Code session)
+earnCoins(5);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

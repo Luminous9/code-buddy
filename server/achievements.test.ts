@@ -28,6 +28,9 @@ const EMPTY_EVENTS: EventCounters = {
   reactions_given: 0,
   commands_run: 0,
   days_active: 0,
+  pulls_total: 0,
+  legendary_pulls: 0,
+  shiny_pulls: 0,
 };
 
 function makeEvents(overrides: Partial<EventCounters> = {}): EventCounters {
@@ -222,6 +225,9 @@ describe("unlock simulation via check functions", () => {
       reactions_given: 999,
       commands_run: 999,
       days_active: 999,
+      pulls_total: 999,
+      legendary_pulls: 999,
+      shiny_pulls: 999,
     });
     const wouldUnlock = ACHIEVEMENTS.filter((a) => a.check(maxed));
     expect(wouldUnlock.length).toBe(ACHIEVEMENTS.length);
@@ -308,6 +314,8 @@ describe("secret achievements", () => {
     expect(secretIds).toContain("battle_scarred");
     expect(secretIds).toContain("month_streak");
     expect(secretIds).toContain("thousand_turns");
+    expect(secretIds).toContain("whale");
+    expect(secretIds).toContain("shiny_hunter");
   });
 
   test("non-secret achievements are the majority", () => {

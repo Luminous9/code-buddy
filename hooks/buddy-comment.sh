@@ -12,6 +12,7 @@ STATE_DIR="$BUDDY_STATE_DIR"
 STATUS_FILE="$STATE_DIR/status.json"
 CONFIG_FILE="$STATE_DIR/config.json"
 EVENTS_FILE="$STATE_DIR/events.json"
+WALLET_FILE="$STATE_DIR/wallet.json"
 
 [ -f "$STATUS_FILE" ] || exit 0
 
@@ -71,7 +72,14 @@ if command -v jq >/dev/null 2>&1; then
         echo '{}' > "$EVENTS_FILE"
     fi
     TMP=$(mktemp)
-    jq '.turns = (.turns // 0 + 1)' "$EVENTS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$EVENTS_FILE"
+    jq '.turns = ((.turns // 0) + 1)' "$EVENTS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$EVENTS_FILE"
+
+    # Earn 1 coin per turn
+    if [ ! -f "$WALLET_FILE" ]; then
+        echo '{}' > "$WALLET_FILE"
+    fi
+    TMP=$(mktemp)
+    jq '.coins = ((.coins // 0) + 1) | .totalEarned = ((.totalEarned // 0) + 1)' "$WALLET_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$WALLET_FILE"
 fi
 
 exit 0
