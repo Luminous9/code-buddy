@@ -305,20 +305,57 @@ if [ -n "$BUBBLE" ]; then
     BUBBLE_TEXT="${BUBBLE_TEXT#\"}"
 fi
 
+# ─── Display width (accounts for wide Unicode chars like emoji) ──────────────
+display_width() {
+  local str="$1"
+  # Fast path: pure ASCII — ${#str} is correct and avoids forking perl
+  if [[ "$str" != *[^[:ascii:]]* ]]; then
+    echo "${#str}"
+    return
+  fi
+  if command -v perl >/dev/null 2>&1; then
+    printf '%s' "$str" | perl -CS -ne '
+      my $w = 0;
+      for (split //) {
+        my $c = ord;
+        if ($c > 0xFFFF || ($c >= 0x1100 && $c <= 0x115F) ||
+            ($c >= 0x2E80 && $c <= 0xA4CF) ||
+            ($c >= 0xAC00 && $c <= 0xD7A3) ||
+            ($c >= 0xF900 && $c <= 0xFAFF) ||
+            ($c >= 0xFE10 && $c <= 0xFE6F) ||
+            ($c >= 0xFF01 && $c <= 0xFF60) ||
+            ($c >= 0xFFE0 && $c <= 0xFFE6)) {
+          $w += 2;
+        } else {
+          $w += 1;
+        }
+      }
+      print $w;
+    '
+  else
+    echo "${#str}"
+  fi
+}
+
 # ─── Word-wrap bubble text ────────────────────────────────────────────────────
 INNER_W=28
 TEXT_LINES=()
 if [ -n "$BUBBLE_TEXT" ]; then
     WORDS=($BUBBLE_TEXT)
     CUR_LINE=""
+    CUR_DW=0
     for word in "${WORDS[@]}"; do
+        WORD_DW=$(display_width "$word")
         if [ -z "$CUR_LINE" ]; then
             CUR_LINE="$word"
-        elif [ $(( ${#CUR_LINE} + 1 + ${#word} )) -le $INNER_W ]; then
+            CUR_DW=$WORD_DW
+        elif [ $(( CUR_DW + 1 + WORD_DW )) -le $INNER_W ]; then
             CUR_LINE="$CUR_LINE $word"
+            CUR_DW=$(( CUR_DW + 1 + WORD_DW ))
         else
             TEXT_LINES+=("$CUR_LINE")
             CUR_LINE="$word"
+            CUR_DW=$WORD_DW
         fi
     done
     [ -n "$CUR_LINE" ] && TEXT_LINES+=("$CUR_LINE")
@@ -338,7 +375,7 @@ if [ $TEXT_COUNT -gt 0 ]; then
     BUBBLE_TYPES+=("border")
     # Text rows: "| text padded |"
     for tl in "${TEXT_LINES[@]}"; do
-        tpad=$(( INNER_W - ${#tl} ))
+        tpad=$(( INNER_W - $(display_width "$tl") ))
         [ "$tpad" -lt 0 ] && tpad=0
         padding=$(printf '%*s' "$tpad" '')
         BUBBLE_LINES+=("| ${tl}${padding} |")
@@ -382,8 +419,16 @@ if [ $BUBBLE_COUNT -gt 2 ]; then
 fi
 
 # ─── Output: merged bubble box + connector + art per line ─────────────────────
-for (( i=0; i<ART_COUNT; i++ )); do
-    art_part="${ALL_COLORS[$i]}${ALL_LINES[$i]}${NC}"
+TOTAL_ROWS=$ART_COUNT
+if [ $BUBBLE_COUNT -gt 0 ] && [ $(( BUBBLE_START + BUBBLE_COUNT )) -gt $TOTAL_ROWS ]; then
+    TOTAL_ROWS=$(( BUBBLE_START + BUBBLE_COUNT ))
+fi
+for (( i=0; i<TOTAL_ROWS; i++ )); do
+    if [ $i -lt $ART_COUNT ]; then
+        art_part="${ALL_COLORS[$i]}${ALL_LINES[$i]}${NC}"
+    else
+        art_part=$(printf '%*s' "$ART_W" '')
+    fi
 
     if [ $BUBBLE_COUNT -gt 0 ]; then
         bi=$(( i - BUBBLE_START ))
