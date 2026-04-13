@@ -23,12 +23,13 @@ import {
   existsSync,
   readdirSync,
   renameSync,
+  rmSync,
 } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import type { Companion } from "./engine.ts";
 
-const STATE_DIR = join(homedir(), ".claude-buddy");
+export const STATE_DIR = join(homedir(), ".claude-buddy");
 const MANIFEST_FILE = join(STATE_DIR, "menagerie.json");
 const CONFIG_FILE = join(STATE_DIR, "config.json");
 
@@ -406,4 +407,65 @@ export function unsetBuddyStatusLine(
   } catch {
     return false;
   }
+}
+
+// ─── Plugin uninstall cleanup ───────────────────────────────────────────────
+
+export interface CleanupResult {
+  statusLineRemoved: boolean;
+  foreignStatusLineKept: boolean;
+  transientFilesRemoved: number;
+}
+
+const TRANSIENT_PREFIXES = [
+  "popup-stop.",
+  "popup-resize.",
+  "popup-env.",
+  "popup-scroll.",
+  "popup-reopen-pid.",
+  "reaction.",
+  ".last_reaction.",
+  ".last_comment.",
+];
+
+/**
+ * Clean up plugin-owned writes to the user's global state so that
+ * `claude plugin uninstall` leaves no orphaned entries behind. Specifically:
+ *   - remove settings.statusLine if it points to buddy-status.sh
+ *   - delete session-scoped transient files under ~/.claude-buddy/
+ *
+ * Companion data (menagerie.json, status.json, config.json) is intentionally
+ * kept — users reinstalling get their buddy back. Call-sites that want a full
+ * wipe should delete STATE_DIR themselves after calling this.
+ */
+export function cleanupPluginState(
+  settingsPath: string = CLAUDE_SETTINGS_PATH,
+  stateDir: string = STATE_DIR,
+): CleanupResult {
+  const statusLineRemoved = unsetBuddyStatusLine(settingsPath);
+
+  let foreignStatusLineKept = false;
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    const cmd = settings.statusLine?.command;
+    if (cmd && !cmd.includes("buddy-status.sh")) foreignStatusLineKept = true;
+  } catch {
+    /* missing settings.json is fine */
+  }
+
+  let transientFilesRemoved = 0;
+  try {
+    if (existsSync(stateDir)) {
+      for (const f of readdirSync(stateDir)) {
+        if (TRANSIENT_PREFIXES.some(p => f.startsWith(p))) {
+          rmSync(join(stateDir, f), { force: true });
+          transientFilesRemoved++;
+        }
+      }
+    }
+  } catch {
+    /* state dir unreadable is fine */
+  }
+
+  return { statusLineRemoved, foreignStatusLineKept, transientFilesRemoved };
 }

@@ -42,6 +42,7 @@ import {
   listCompanionSlots,
   setBuddyStatusLine,
   unsetBuddyStatusLine,
+  cleanupPluginState,
 } from "./state.ts";
 import {
   getReaction, generatePersonalityPrompt,
@@ -489,7 +490,10 @@ server.tool(
         content: [
           {
             type: "text",
-            text: "Status line enabled! Restart Claude Code to see your buddy in the status line.",
+            text:
+              "Status line enabled! Restart Claude Code to see your buddy in the status line.\n\n" +
+              "Note: this writes an entry to ~/.claude/settings.json that `claude plugin uninstall` does not remove. " +
+              "Run `/buddy uninstall` before uninstalling the plugin to clean it up.",
           },
         ],
       };
@@ -504,6 +508,47 @@ server.tool(
         ],
       };
     }
+  },
+);
+
+// ─── Tool: buddy_uninstall ───────────────────────────────────────────────────
+
+server.tool(
+  "buddy_uninstall",
+  "Clean up claude-buddy's writes to ~/.claude/settings.json and transient session files in ~/.claude-buddy/, in preparation for `claude plugin uninstall`. Companion data (menagerie, status, config) is intentionally preserved so reinstalling restores the buddy. The tool only cleans the plugin's own settings — it never removes a foreign statusLine.",
+  {},
+  async () => {
+    const result = cleanupPluginState();
+
+    const lines: string[] = [];
+    lines.push("claude-buddy: settings.json cleanup complete.");
+    lines.push("");
+    lines.push(
+      result.statusLineRemoved
+        ? "  \u2713 statusLine entry removed from ~/.claude/settings.json"
+        : "  \u2014 no buddy statusLine was present (nothing to remove)",
+    );
+    if (result.foreignStatusLineKept) {
+      lines.push(
+        "  \u2713 a non-buddy statusLine was detected and left untouched",
+      );
+    }
+    lines.push(
+      `  \u2713 ${result.transientFilesRemoved} transient session file(s) removed from ~/.claude-buddy/`,
+    );
+    lines.push("  \u2014 companion data at ~/.claude-buddy/ preserved");
+    lines.push("");
+    lines.push("Now run these commands via the Bash tool, in order:");
+    lines.push("");
+    lines.push("  claude plugin uninstall claude-buddy@claude-buddy");
+    lines.push("  claude plugin marketplace remove claude-buddy");
+    lines.push("  rm -rf ~/.claude/plugins/cache/claude-buddy");
+    lines.push("");
+    lines.push(
+      "After those three commands the plugin is fully removed. Restart Claude Code to apply.",
+    );
+
+    return { content: [{ type: "text", text: lines.join("\n") }] };
   },
 );
 
