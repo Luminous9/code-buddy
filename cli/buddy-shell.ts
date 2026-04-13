@@ -7,23 +7,49 @@
  * Everything else passes through unmodified.
  *
  * Usage:
- *   npx tsx cli/buddy-shell.ts          # runs claude
- *   npx tsx cli/buddy-shell.ts bash     # runs bash
+ *   bun run buddy-shell                 # preferred — routes through tsx/Node.js
+ *   npx tsx cli/buddy-shell.ts          # same thing, manual
+ *   npx tsx cli/buddy-shell.ts bash     # runs bash instead of claude
+ *
+ * This script cannot be executed directly by Bun (`bun run <path>`) —
+ * node-pty uses libuv functions Bun does not yet implement (oven-sh/bun
+ * #18546). The preflight below refuses early with a helpful message
+ * rather than letting the Bun runtime panic on the native module load.
  */
 
-import { spawn as ptySpawn } from "node-pty";
+// Preflight: refuse to run under Bun. Must happen BEFORE the dynamic
+// node-pty import below, otherwise Bun crashes on the module load.
+if (typeof (globalThis as { Bun?: unknown }).Bun !== "undefined") {
+  process.stderr.write(
+    "\n  ✗ buddy-shell cannot run under Bun — node-pty triggers a known\n" +
+    "    Bun issue (https://github.com/oven-sh/bun/issues/18546).\n\n" +
+    "    Use the npm script instead — it routes through Node.js via tsx:\n\n" +
+    "        bun run buddy-shell\n\n" +
+    "    Or invoke tsx directly:\n\n" +
+    "        npx tsx cli/buddy-shell.ts\n\n",
+  );
+  process.exit(1);
+}
+
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 import { getArtFrame, HAT_ART } from "../server/art.ts";
 import type { Species, Eye, Hat } from "../server/engine.ts";
 import { getBiome, listBiomes } from "./biomes.ts";
 import xtermPkg from "@xterm/headless";
 import serializePkg from "@xterm/addon-serialize";
+
+// Dynamic import so Bun doesn't try to load node-pty at module-resolution
+// time — the preflight above has already exited if we're under Bun.
+// Using the Homebridge fork rather than Microsoft's upstream because the
+// upstream ships no Linux prebuilds, forcing every Linux user to install
+// node-gyp + Python + build-essential just to run this script.
+const { spawn: ptySpawn } = await import("@homebridge/node-pty-prebuilt-multiarch");
+
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { Terminal } = xtermPkg as any;
 const { SerializeAddon } = serializePkg as any;
 
