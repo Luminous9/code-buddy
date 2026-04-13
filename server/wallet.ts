@@ -10,6 +10,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { isGachaMode } from "./state.ts";
 
 const STATE_DIR = join(homedir(), ".claude-buddy");
 const WALLET_FILE = join(STATE_DIR, "wallet.json");
@@ -61,6 +62,7 @@ export function saveWallet(wallet: WalletState): void {
 }
 
 export function earnCoins(amount: number): WalletState {
+  if (!isGachaMode()) return loadWallet();
   const wallet = loadWallet();
   wallet.coins += amount;
   wallet.totalEarned += amount;

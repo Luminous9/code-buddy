@@ -13,6 +13,7 @@
 import {
   loadActiveSlot, saveActiveSlot, saveCompanionSlot,
   slugify, unusedName, writeStatusState, loadCompanionSlot,
+  isGachaMode,
 } from "../server/state.ts";
 import {
   generateBones, RARITIES, RARITY_STARS,
@@ -600,6 +601,12 @@ function handleKey(key: string, s: State): boolean {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  if (!isGachaMode()) {
+    console.log("\n  Gacha mode is off. Enable it with:\n");
+    console.log("    bun run settings gacha on");
+    console.log("    /buddy gacha on\n");
+    process.exit(0);
+  }
   const s = freshState();
 
   // Setup terminal

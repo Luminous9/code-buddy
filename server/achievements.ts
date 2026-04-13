@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "
 import { join } from "path";
 import { buddyStateDir } from "./path.ts";
 import { earnCoins } from "./wallet.ts";
+import { isGachaMode } from "./state.ts";
 
 const STATE_DIR = buddyStateDir();
 const EVENTS_FILE = join(STATE_DIR, "events.json");
@@ -175,7 +176,7 @@ export function trackActiveDay(): void {
   events.days_active = tracker.totalDays;
   saveGlobalEvents(events);
 
-  earnCoins(10); // daily login bonus
+  if (isGachaMode()) earnCoins(10); // daily login bonus
 }
 
 // ─── Achievement definitions ─────────────────────────────────────────────────

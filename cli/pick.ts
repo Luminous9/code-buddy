@@ -18,6 +18,7 @@
 import {
   loadActiveSlot, saveActiveSlot, listCompanionSlots,
   loadCompanionSlot, saveCompanionSlot, slugify, unusedName, writeStatusState,
+  isGachaMode,
 } from "../server/state.ts";
 import {
   generateBones, SPECIES, RARITIES, STAT_NAMES, RARITY_STARS,
@@ -137,7 +138,8 @@ const LEFT_W = 36;
 
 function savedPane(s: State): string[] {
   const lines: string[] = [];
-  lines.push(`${B}  Your Menagerie${N}  ${GR}[s] search${N}`);
+  const searchHint = isGachaMode() ? `${D}[s] \u2718${N}` : `${GR}[s] search${N}`;
+  lines.push(`${B}  Your Menagerie${N}  ${searchHint}`);
   lines.push(GR + "  " + "─".repeat(LEFT_W - 2) + N);
 
   if (s.savedSlots.length === 0) {
@@ -385,7 +387,10 @@ function onKey(key: string, s: State): boolean {
 
     case "saved": {
       if (key === "q")                          return true;
-      if (key === "s")                          { s.mode = "criteria"; break; }
+      if (key === "s") {
+        if (isGachaMode()) { s.message = "Gacha mode is on — search disabled. Use bun run pull."; break; }
+        s.mode = "criteria"; break;
+      }
       if (key === "\x1b[A" || key === "k")      s.savedCursor = clamp(s.savedCursor - 1, 0, s.savedSlots.length - 1);
       else if (key === "\x1b[B" || key === "j") s.savedCursor = clamp(s.savedCursor + 1, 0, s.savedSlots.length - 1);
       else if (key === "r") {

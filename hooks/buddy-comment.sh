@@ -74,12 +74,15 @@ if command -v jq >/dev/null 2>&1; then
     TMP=$(mktemp)
     jq '.turns = ((.turns // 0) + 1)' "$EVENTS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$EVENTS_FILE"
 
-    # Earn 1 coin per turn
-    if [ ! -f "$WALLET_FILE" ]; then
-        echo '{}' > "$WALLET_FILE"
+    # Earn 1 coin per turn (gacha mode only)
+    GACHA=$(jq -r '.gachaMode // false' "$CONFIG_FILE" 2>/dev/null || echo false)
+    if [ "$GACHA" = "true" ]; then
+        if [ ! -f "$WALLET_FILE" ]; then
+            echo '{}' > "$WALLET_FILE"
+        fi
+        TMP=$(mktemp)
+        jq '.coins = ((.coins // 0) + 1) | .totalEarned = ((.totalEarned // 0) + 1)' "$WALLET_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$WALLET_FILE"
     fi
-    TMP=$(mktemp)
-    jq '.coins = ((.coins // 0) + 1) | .totalEarned = ((.totalEarned // 0) + 1)' "$WALLET_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$WALLET_FILE"
 fi
 
 exit 0

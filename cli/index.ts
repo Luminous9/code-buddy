@@ -94,6 +94,7 @@ Settings:
   settings          Show current settings
   settings cooldown <n>  Set comment cooldown (0-300 seconds)
   settings ttl <n>       Set reaction display duration (0-300s, 0 = permanent)
+  settings gacha on|off  Toggle gacha mode (coin economy + pulls vs free hunt/pick)
 
 Diagnostics:
   doctor            Run diagnostic report (paste output in bug reports)

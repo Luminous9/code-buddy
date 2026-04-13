@@ -20,9 +20,11 @@ if (!key) {
   ─────────────────────
   Comment cooldown:  ${cfg.commentCooldown}s    (0 = no throttling, default 30)
   Reaction TTL:      ${cfg.reactionTTL}s    (0 = permanent, default 0)
+  Gacha mode:        ${cfg.gachaMode ? "on" : "off"}    (on = coin economy + pulls, off = free hunt/pick)
 
   Change:  bun run settings cooldown <seconds>
            bun run settings ttl <seconds>
+           bun run settings gacha on|off
 `);
   process.exit(0);
 }
@@ -63,6 +65,30 @@ if (key === "ttl") {
   process.exit(0);
 }
 
+if (key === "gacha") {
+  if (value === undefined) {
+    const cfg = loadConfig();
+    console.log(`Gacha mode: ${cfg.gachaMode ? "on" : "off"}`);
+    process.exit(0);
+  }
+
+  if (value !== "on" && value !== "off") {
+    console.error("Error: gacha must be 'on' or 'off'");
+    process.exit(1);
+  }
+
+  const enabled = value === "on";
+  const cfg = saveConfig({ gachaMode: enabled });
+  console.log(`Updated: gacha mode → ${cfg.gachaMode ? "on" : "off"}`);
+  if (enabled) {
+    console.log("  Coin economy active. Earn coins by coding, spend them on pulls.");
+    console.log("  Hunt and pick search are now disabled.");
+  } else {
+    console.log("  Free buddy acquisition enabled. Coin economy disabled.");
+  }
+  process.exit(0);
+}
+
 console.error(`Unknown setting: ${key}`);
-console.error("Available: cooldown, ttl");
+console.error("Available: cooldown, ttl, gacha");
 process.exit(1);

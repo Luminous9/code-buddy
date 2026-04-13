@@ -331,6 +331,7 @@ export interface BuddyConfig {
   bubblePosition: "top" | "left";
   showRarity: boolean;
   statusLineEnabled: boolean;
+  gachaMode: boolean;
 }
 
 const DEFAULT_CONFIG: BuddyConfig = {
@@ -340,7 +341,12 @@ const DEFAULT_CONFIG: BuddyConfig = {
   bubblePosition: "top",
   showRarity: true,
   statusLineEnabled: false,
+  gachaMode: false,
 };
+
+export function isGachaMode(): boolean {
+  return loadConfig().gachaMode;
+}
 
 export function loadConfig(): BuddyConfig {
   try {

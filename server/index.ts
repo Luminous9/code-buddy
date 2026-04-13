@@ -43,6 +43,7 @@ import {
   setBuddyStatusLine,
   unsetBuddyStatusLine,
   cleanupPluginState,
+  isGachaMode,
 } from "./state.ts";
 import {
   buddyStateDir,
@@ -183,7 +184,7 @@ server.tool(
     saveReaction(reaction, "pet");
     writeStatusState(companion, reaction);
     incrementEvent("pets", 1, activeSlot());
-    earnCoins(1);
+    if (isGachaMode()) earnCoins(1);
 
     const face = renderFace(companion.bones.species, companion.bones.eye);
     return {
@@ -334,6 +335,7 @@ server.tool(
       "  /buddy dismiss    Remove a saved buddy slot",
       "  /buddy pull       Gacha pull — spend coins to hatch a random buddy",
       "  /buddy wallet     Check coin balance and pity progress",
+      "  /buddy gacha      Show or toggle gacha mode (on/off)",
       "  /buddy frequency  Show or set comment cooldown (tmux only)",
       "  /buddy style      Show or set bubble style (tmux only)",
       "  /buddy position   Show or set bubble position (tmux only)",
@@ -774,6 +776,11 @@ server.tool(
     ),
   },
   async ({ species, rarity, name }) => {
+    if (isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is enabled — free buddy generation is disabled. Use `buddy_pull` to spend coins on a random pull, or disable gacha with `/buddy gacha off`." }],
+      };
+    }
     const { randomBytes } = await import("crypto");
 
     const maxAttempts =
@@ -839,6 +846,11 @@ server.tool(
   "Show current coin balance, earning stats, and pity progress for gacha pulls",
   {},
   async () => {
+    if (!isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
+      };
+    }
     ensureCompanion();
     incrementEvent("commands_run", 1, activeSlot());
     const w = loadWallet();
@@ -865,6 +877,34 @@ server.tool(
   },
 );
 
+// ─── Tool: buddy_gacha ──────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_gacha",
+  "Toggle gacha mode on or off. When on: earn coins, do pulls, hunt/pick search disabled. When off: free acquisition enabled, coin economy disabled.",
+  {
+    enabled: z.boolean().optional().describe(
+      "Set gacha mode on (true) or off (false). If omitted, shows current status.",
+    ),
+  },
+  async ({ enabled }) => {
+    if (enabled === undefined) {
+      const on = isGachaMode();
+      return {
+        content: [{ type: "text", text: `Gacha mode is **${on ? "ON" : "OFF"}**.\n\n${on ? "Earn coins by coding, spend them on pulls. Hunt and pick search are disabled." : "Free buddy acquisition via hunt/pick is enabled. Coin economy is disabled."}\n\nToggle: \`/buddy gacha on\` or \`/buddy gacha off\`\nCLI: \`bun run settings gacha on\` or \`bun run settings gacha off\`` }],
+      };
+    }
+    saveConfig({ gachaMode: enabled });
+    const label = enabled ? "ON" : "OFF";
+    const detail = enabled
+      ? "Coin economy is now active. Earn coins by coding, spend them on pulls. Hunt and pick search are disabled."
+      : "Free buddy acquisition is now enabled. Coin economy is disabled.";
+    return {
+      content: [{ type: "text", text: `Gacha mode: **${label}**\n\n${detail}` }],
+    };
+  },
+);
+
 // ─── Tool: buddy_pull ───────────────────────────────────────────────────────
 
 server.tool(
@@ -882,6 +922,11 @@ server.tool(
     ),
   },
   async ({ count, keep, name }) => {
+    if (!isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
+      };
+    }
     ensureCompanion();
     const slot = activeSlot();
     incrementEvent("commands_run", 1, slot);
@@ -1054,7 +1099,7 @@ server.resource(
 // ─── Start ──────────────────────────────────────────────────────────────────
 
 // Award session coins once per MCP server startup (= once per Claude Code session)
-earnCoins(5);
+if (isGachaMode()) earnCoins(5);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

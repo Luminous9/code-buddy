@@ -270,6 +270,7 @@ const SETTINGS_ITEMS = [
   { key: "bubblePosition", label: "Bubble Position" },
   { key: "showRarity", label: "Show Rarity" },
   { key: "statusLineEnabled", label: "Status Line" },
+  { key: "gachaMode", label: "Gacha Mode" },
 ] as const;
 
 function SettingsListPane({ cursor, config, focused }: {
@@ -319,6 +320,11 @@ const ACHIEVEMENT_PROGRESS: Record<string, { counter: keyof EventCounters; thres
   power_user: { counter: "commands_run", threshold: 50 },
   dedicated: { counter: "turns", threshold: 200 },
   thousand_turns: { counter: "turns", threshold: 1000 },
+  first_pull: { counter: "pulls_total", threshold: 1 },
+  high_roller: { counter: "pulls_total", threshold: 25 },
+  whale: { counter: "pulls_total", threshold: 100 },
+  jackpot: { counter: "legendary_pulls", threshold: 1 },
+  shiny_hunter: { counter: "shiny_pulls", threshold: 1 },
 };
 
 function AchievementsListPane({ cursor, unlockedIds, focused }: {
@@ -1375,6 +1381,7 @@ const SETTING_DEFS: SettingDef[] = [
   { key: "bubblePosition", label: "Bubble Position", description: ["Bubble placement.", "", "top → above buddy", "left → beside buddy"], type: "options", options: ["top", "left"], default: "top" },
   { key: "showRarity", label: "Show Rarity", description: ["Show rarity stars in", "the status line.", "", "true → ★★★★ visible", "false → hidden"], type: "options", options: ["true", "false"], default: "true" },
   { key: "statusLineEnabled", label: "Status Line", description: ["Animated buddy in Claude Code's", "status line bar.", "", "true  → patches settings.json", "false → removes it", "", "Restart Claude Code after toggle."], type: "options", options: ["true", "false"], default: "false" },
+  { key: "gachaMode", label: "Gacha Mode", description: ["Toggle the coin economy.", "", "true  → earn coins, do pulls", "         hunt/pick search disabled", "false → free hunt/pick acquisition", "         coin economy disabled"], type: "options", options: ["true", "false"], default: "false" },
 ];
 
 function SettingDetailPane({ settingIndex, config, editing, numInput, optCursor }: {
