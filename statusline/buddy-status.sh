@@ -17,9 +17,6 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/paths.sh"
 
 STATE="$BUDDY_STATE_DIR/status.json"
-# Session ID: sanitized tmux pane number, or "default" outside tmux
-SID="${TMUX_PANE#%}"
-SID="${SID:-default}"
 
 [ -f "$STATE" ] || exit 0
 
@@ -32,12 +29,47 @@ NAME=$(jq -r '.name // ""' "$STATE" 2>/dev/null)
 SPECIES=$(jq -r '.species // ""' "$STATE" 2>/dev/null)
 HAT=$(jq -r '.hat // "none"' "$STATE" 2>/dev/null)
 RARITY=$(jq -r '.rarity // "common"' "$STATE" 2>/dev/null)
-REACTION=$(jq -r '.reaction // ""' "$STATE" 2>/dev/null)
 ACHIEVEMENT=$(jq -r '.achievement // ""' "$STATE" 2>/dev/null)
 # eye is written to status.json by writeStatusState (v2+); fall back to "°"
 E=$(jq -r '.eye // "°"' "$STATE" 2>/dev/null)
 
 cat > /dev/null  # drain stdin
+
+# ─── Resolve TTY for per-session reaction file ──────────────────────────────
+# Walks the process tree to find the TTY device (works in tmux panes, plain
+# terminals, VS Code, SSH — anywhere a PTY is allocated).
+TTY_ID=""
+COLS=0
+_PID=$$
+for _ in 1 2 3 4 5 6; do
+    _PID=$(ps -o ppid= -p "$_PID" 2>/dev/null | tr -d ' ')
+    [ -z "$_PID" ] || [ "$_PID" = "1" ] && break
+    if [ -z "$TTY_ID" ]; then
+        _TTY=$(ps -o tty= -p "$_PID" 2>/dev/null | tr -d ' ')
+        if [ -n "$_TTY" ] && [ "$_TTY" != "??" ] && [ "$_TTY" != "?" ]; then
+            TTY_ID="$_TTY"
+        fi
+    fi
+    # Try to detect terminal width — Linux /proc
+    PTY=$(readlink "/proc/${_PID}/fd/0" 2>/dev/null)
+    if [ -c "$PTY" ] 2>/dev/null; then
+        COLS=$(stty size < "$PTY" 2>/dev/null | awk '{print $2}')
+        [ "${COLS:-0}" -gt 40 ] 2>/dev/null && break
+    fi
+    # macOS: /proc doesn't exist — get TTY name from process table
+    if [ "${COLS:-0}" -lt 40 ] 2>/dev/null; then
+        _TTY_NAME=$(ps -o tty= -p "$_PID" 2>/dev/null | tr -d ' ')
+        if [ -n "$_TTY_NAME" ] && [ "$_TTY_NAME" != "??" ] && [ "$_TTY_NAME" != "?" ]; then
+            _TTY_DEV="/dev/$_TTY_NAME"
+            if [ -c "$_TTY_DEV" ] 2>/dev/null; then
+                COLS=$(stty size < "$_TTY_DEV" 2>/dev/null | awk '{print $2}')
+                [ "${COLS:-0}" -gt 40 ] 2>/dev/null && break
+            fi
+        fi
+    fi
+done
+[ "${COLS:-0}" -lt 40 ] 2>/dev/null && COLS=${COLUMNS:-0}
+[ "${COLS:-0}" -lt 40 ] 2>/dev/null && COLS=125
 
 # ─── Animation: frame from timestamp ─────────────────────────────────────────
 # Original sequence: [0,0,0,0,1,0,0,0,-1,0,0,2,0,0,0] with 500ms ticks
@@ -66,33 +98,6 @@ case "$RARITY" in
 esac
 
 B=$'\xe2\xa0\x80'  # Braille Blank U+2800
-
-# ─── Terminal width ──────────────────────────────────────────────────────────
-COLS=0
-PID=$$
-for _ in 1 2 3 4 5; do
-    PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
-    [ -z "$PID" ] || [ "$PID" = "1" ] && break
-
-    # Linux: read PTY device from /proc
-    PTY=$(readlink "/proc/${PID}/fd/0" 2>/dev/null)
-    if [ -c "$PTY" ] 2>/dev/null; then
-        COLS=$(stty size < "$PTY" 2>/dev/null | awk '{print $2}')
-        [ "${COLS:-0}" -gt 40 ] 2>/dev/null && break
-    fi
-
-    # macOS: /proc doesn't exist — get TTY name from process table
-    TTY_NAME=$(ps -o tty= -p "$PID" 2>/dev/null | tr -d ' ')
-    if [ -n "$TTY_NAME" ] && [ "$TTY_NAME" != "??" ] && [ "$TTY_NAME" != "?" ]; then
-        TTY_DEV="/dev/$TTY_NAME"
-        if [ -c "$TTY_DEV" ] 2>/dev/null; then
-            COLS=$(stty size < "$TTY_DEV" 2>/dev/null | awk '{print $2}')
-            [ "${COLS:-0}" -gt 40 ] 2>/dev/null && break
-        fi
-    fi
-done
-[ "${COLS:-0}" -lt 40 ] 2>/dev/null && COLS=${COLUMNS:-0}
-[ "${COLS:-0}" -lt 40 ] 2>/dev/null && COLS=125
 
 # ─── Species art: 3 frames each (F0, F1, F2) ────────────────────────────────
 # Each frame = 4 lines (L1..L4). Selected by $FRAME.
@@ -229,36 +234,41 @@ case "$HAT" in
   tinyduck)  HAT_LINE="  ,>" ;;
 esac
 
-# ─── Reaction bubble (with TTL check) ────────────────────────────────────────
+# ─── Reaction bubble (read from per-session file, with TTL check) ────────────
 BUBBLE=""
 if [ -n "$ACHIEVEMENT" ] && [ "$ACHIEVEMENT" != "null" ] && [ "$ACHIEVEMENT" != "" ]; then
     BUBBLE=$'\xf0\x9f\x8f\x86'" $ACHIEVEMENT"
 fi
-REACTION_FILE="$BUDDY_STATE_DIR/reaction.$SID.json"
+REACTION_FILE="$BUDDY_STATE_DIR/reaction.${TTY_ID:-default}.json"
+REACTION=""
 REACTION_TTL=0
 CONFIG_FILE="$BUDDY_STATE_DIR/config.json"
 if [ -f "$CONFIG_FILE" ]; then
     _ttl=$(jq -r '.reactionTTL // 0' "$CONFIG_FILE" 2>/dev/null || echo 0)
     case "$_ttl" in ''|*[!0-9]*) ;; *) REACTION_TTL="$_ttl" ;; esac
 fi
-if [ -n "$REACTION" ] && [ "$REACTION" != "null" ] && [ "$REACTION" != "" ]; then
-    FRESH=0
-    if [ "$REACTION_TTL" -eq 0 ]; then
-        FRESH=1
-    elif [ -f "$REACTION_FILE" ]; then
-        TS=$(jq -r '.timestamp // 0' "$REACTION_FILE" 2>/dev/null || echo 0)
-        if [ "$TS" != "0" ]; then
-            NOW=$(date +%s)
-            AGE=$(( NOW - TS / 1000 ))
-            [ "$AGE" -lt "$REACTION_TTL" ] && FRESH=1
-        fi
-    fi
-    if [ "$FRESH" -eq 1 ]; then
-        if [ -n "$BUBBLE" ]; then
-            BUBBLE="$BUBBLE | \"${REACTION}\""
+if [ -f "$REACTION_FILE" ]; then
+    _REACTION=$(jq -r '.reaction // ""' "$REACTION_FILE" 2>/dev/null)
+    if [ -n "$_REACTION" ] && [ "$_REACTION" != "null" ]; then
+        FRESH=0
+        if [ "$REACTION_TTL" -eq 0 ]; then
+            FRESH=1
         else
-            BUBBLE="\"${REACTION}\""
+            TS=$(jq -r '.timestamp // 0' "$REACTION_FILE" 2>/dev/null || echo 0)
+            if [ "$TS" != "0" ]; then
+                NOW=$(date +%s)
+                AGE=$(( NOW - TS / 1000 ))
+                [ "$AGE" -lt "$REACTION_TTL" ] && FRESH=1
+            fi
         fi
+        [ "$FRESH" -eq 1 ] && REACTION="$_REACTION"
+    fi
+fi
+if [ -n "$REACTION" ]; then
+    if [ -n "$BUBBLE" ]; then
+        BUBBLE="$BUBBLE | \"${REACTION}\""
+    else
+        BUBBLE="\"${REACTION}\""
     fi
 fi
 

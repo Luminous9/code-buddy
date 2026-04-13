@@ -2,22 +2,35 @@
 # claude-buddy PostToolUse hook
 # Detects events in Bash tool output and writes a reaction to the status line.
 #
-# Combined: PR #4 species reactions + PR #6 session isolation + PR #13 field fix
+# Combined: PR #4 species reactions + TTY session isolation + PR #13 field fix
 
 # shellcheck source=../scripts/paths.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/paths.sh"
 
 STATE_DIR="$BUDDY_STATE_DIR"
-# Session ID: sanitized tmux pane number, or "default" outside tmux
-SID="${TMUX_PANE#%}"
-SID="${SID:-default}"
-REACTION_FILE="$STATE_DIR/reaction.$SID.json"
 STATUS_FILE="$STATE_DIR/status.json"
-COOLDOWN_FILE="$STATE_DIR/.last_reaction.$SID"
 CONFIG_FILE="$STATE_DIR/config.json"
 EVENTS_FILE="$STATE_DIR/events.json"
 
 [ -f "$STATUS_FILE" ] || exit 0
+
+# ─── Resolve TTY for per-session isolation ───────────────────────────────────
+# Walks the process tree to find the TTY device (works in tmux, plain
+# terminals, VS Code, SSH — anywhere a PTY is allocated).
+TTY_ID=""
+PID=$$
+for _ in 1 2 3 4 5 6; do
+    PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
+    [ -z "$PID" ] || [ "$PID" = "1" ] && break
+    _TTY=$(ps -o tty= -p "$PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$_TTY" ] && [ "$_TTY" != "??" ]; then
+        TTY_ID="$_TTY"
+        break
+    fi
+done
+
+REACTION_FILE="$STATE_DIR/reaction.${TTY_ID:-default}.json"
+COOLDOWN_FILE="$STATE_DIR/.last_reaction.${TTY_ID:-default}"
 
 INPUT=$(cat)
 
@@ -177,14 +190,10 @@ if [ -n "$REASON" ] && [ -n "$REACTION" ]; then
     mkdir -p "$STATE_DIR"
     date +%s > "$COOLDOWN_FILE"
 
-    # Write reaction for status line (use jq for safe JSON encoding)
+    # Write per-session reaction file (use jq for safe JSON encoding)
     jq -n --arg r "$REACTION" --arg ts "$(date +%s)000" --arg reason "$REASON" \
       '{reaction: $r, timestamp: ($ts | tonumber), reason: $reason}' \
       > "$REACTION_FILE"
-
-    # Update status.json with reaction
-    TMP=$(mktemp)
-    jq --arg r "$REACTION" '.reaction = $r' "$STATUS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$STATUS_FILE"
 
     # Increment achievement event counter
     if command -v jq >/dev/null 2>&1; then

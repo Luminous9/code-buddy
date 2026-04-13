@@ -7,17 +7,17 @@
  *
  * Storage layout (v3 — single manifest):
  *   <state-dir>/
- *     menagerie.json   <- SSOT: { active, companions: { [slot]: Companion } }
- *     reaction.$SID.json  <- transient reaction state (session-scoped)
- *     status.json      <- compact state for the status-line shell script
- *     config.json      <- user preferences (cooldown, bubble style, etc.)
+ *     menagerie.json       <- SSOT: { active, companions: { [slot]: Companion } }
+ *     reaction.$TTY.json   <- transient reaction state (session-scoped via TTY)
+ *     status.json          <- compact state for the status-line shell script
+ *     config.json          <- user preferences (cooldown, bubble style, etc.)
  *
  * Rules:
  *   - saveCompanionSlot()  APPENDS only — throws if the slot already exists
  *   - saveCompanion()      UPDATES the currently-active slot (rename / personality)
  *   - All manifest writes are atomic (write tmp -> rename)
  *
- * Combined: PR #4 menagerie + PR #6 session isolation + config
+ * Combined: PR #4 menagerie + TTY session isolation + config
  */
 
 import {
@@ -29,6 +29,7 @@ import {
   renameSync,
   rmSync,
 } from "fs";
+import { execSync } from "child_process";
 import { join } from "path";
 import type { Companion } from "./engine.ts";
 import {
@@ -42,16 +43,36 @@ export const STATE_DIR = buddyStateDir();
 const MANIFEST_FILE = join(STATE_DIR, "menagerie.json");
 const CONFIG_FILE = join(STATE_DIR, "config.json");
 
-// ─── Session ID (PR #6: tmux session isolation) ─────────────────────────────
+// ─── TTY-based session isolation ────────────────────────────────────────────
+// Walks the process tree to find the TTY device (works in tmux panes, plain
+// terminals, VS Code, SSH — anywhere a PTY is allocated). Falls back to
+// "default" when no TTY can be resolved (headless / detached).
 
-function sessionId(): string {
-  const pane = process.env.TMUX_PANE;
-  if (!pane) return "default";
-  return pane.replace(/^%/, "");
+let _cachedTtyId: string | null = null;
+
+function resolveTtyId(): string {
+  if (_cachedTtyId !== null) return _cachedTtyId;
+  try {
+    let pid = process.pid;
+    for (let i = 0; i < 6; i++) {
+      const out = execSync(`ps -o ppid=,tty= -p ${pid} 2>/dev/null`, { encoding: "utf8" });
+      const parts = out.trim().split(/\s+/);
+      const ppid = parseInt(parts[0], 10);
+      const tty = parts[1];
+      if (tty && tty !== "??" && tty !== "?") {
+        _cachedTtyId = tty;
+        return tty;
+      }
+      if (!ppid || ppid <= 1) break;
+      pid = ppid;
+    }
+  } catch { /* fallback to "default" */ }
+  _cachedTtyId = "default";
+  return "default";
 }
 
 function reactionFile(): string {
-  return join(STATE_DIR, `reaction.${sessionId()}.json`);
+  return join(STATE_DIR, `reaction.${resolveTtyId()}.json`);
 }
 
 // ─── Manifest schema ─────────────────────────────────────────────────────────
@@ -265,7 +286,7 @@ function migrateIfNeeded(): void {
   saveManifest({ active, companions });
 }
 
-// ─── Reaction state (session-scoped for tmux isolation) ──────────────────────
+// ─── Reaction state (session-scoped via TTY isolation) ───────────────────────
 
 export interface ReactionState {
   reaction: string;
@@ -301,7 +322,7 @@ export function resolveUserId(): string {
   }
 }
 
-// ─── Config persistence (PR #6: tmux popup settings) ─────────────────────────
+// ─── Config persistence ─────────────────────────────────────────────────────
 
 export interface BuddyConfig {
   commentCooldown: number;

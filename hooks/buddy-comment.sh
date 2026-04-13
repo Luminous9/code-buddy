@@ -9,15 +9,28 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/paths.sh"
 
 STATE_DIR="$BUDDY_STATE_DIR"
-# Session ID: sanitized tmux pane number, or "default" outside tmux
-SID="${TMUX_PANE#%}"
-SID="${SID:-default}"
 STATUS_FILE="$STATE_DIR/status.json"
-COOLDOWN_FILE="$STATE_DIR/.last_comment.$SID"
 CONFIG_FILE="$STATE_DIR/config.json"
 EVENTS_FILE="$STATE_DIR/events.json"
 
 [ -f "$STATUS_FILE" ] || exit 0
+
+# ─── Resolve TTY for per-session isolation ───────────────────────────────────
+# Walks the process tree to find the TTY device (works in tmux, plain
+# terminals, VS Code, SSH — anywhere a PTY is allocated).
+TTY_ID=""
+PID=$$
+for _ in 1 2 3 4 5 6; do
+    PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
+    [ -z "$PID" ] || [ "$PID" = "1" ] && break
+    _TTY=$(ps -o tty= -p "$PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$_TTY" ] && [ "$_TTY" != "??" ]; then
+        TTY_ID="$_TTY"
+        break
+    fi
+done
+
+COOLDOWN_FILE="$STATE_DIR/.last_comment.${TTY_ID:-default}"
 
 # Read cooldown from config (default 30s, 0 = disabled)
 COOLDOWN=30
@@ -33,7 +46,7 @@ INPUT=$(cat)
 MSG=$(echo "$INPUT" | jq -r '.last_assistant_message // ""' 2>/dev/null)
 [ -z "$MSG" ] && exit 0
 
-# Extract <!-- buddy: ... --> comment (portable, no grep -P)
+# Extract <!-- buddy: ... --> comment (portable — no grep -P on macOS)
 COMMENT=$(echo "$MSG" | sed -n 's/.*<!-- *buddy: *\(.*[^ ]\) *-->.*/\1/p' | tail -1)
 [ -z "$COMMENT" ] && exit 0
 
@@ -47,14 +60,10 @@ fi
 mkdir -p "$STATE_DIR"
 date +%s > "$COOLDOWN_FILE"
 
-# Update status.json with the reaction
-TMP=$(mktemp)
-jq --arg r "$COMMENT" '.reaction = $r' "$STATUS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$STATUS_FILE"
-
-# Also write reaction file (use jq for safe JSON encoding)
+# Write per-session reaction file (use jq for safe JSON encoding)
 jq -n --arg r "$COMMENT" --arg ts "$(date +%s)000" \
   '{reaction: $r, timestamp: ($ts | tonumber), reason: "turn"}' \
-  > "$STATE_DIR/reaction.$SID.json"
+  > "$STATE_DIR/reaction.${TTY_ID:-default}.json"
 
 # Increment achievement event counters
 if command -v jq >/dev/null 2>&1; then
