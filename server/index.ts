@@ -627,6 +627,7 @@ server.tool(
     }
 
     saveActiveSlot(targetSlot);
+    saveReaction(`*${companion.name} arrives*`, "summon");
     writeStatusState(companion, `*${companion.name} arrives*`);
 
     // Uses markdown renderer so the card displays cleanly in Claude Code's UI.
@@ -808,6 +809,7 @@ server.tool(
 
     saveCompanionSlot(companion, slot);
     saveActiveSlot(slot);
+    saveReaction(`*${buddyName} hatches*`, "pick");
     writeStatusState(companion, `*${buddyName} hatches*`);
 
     const card = renderCompanionCardMarkdown(
