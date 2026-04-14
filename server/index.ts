@@ -147,9 +147,33 @@ function activeSlot(): string {
 
 server.tool(
   "buddy_show",
-  "Show the coding companion with full ASCII art card, stats, and personality",
-  {},
-  async () => {
+  "Show a buddy's full ASCII art card, stats, and personality. Defaults to the active buddy; pass a slot name to show any buddy without switching.",
+  {
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to show. If omitted, shows the active buddy."),
+  },
+  async ({ slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      const card = renderCompanionCardMarkdown(
+        target.bones,
+        target.name,
+        target.personality,
+        `*${target.name} appears*`,
+      );
+      incrementEvent("commands_run", 1, slot);
+      return { content: [{ type: "text", text: card }] };
+    }
+
     const companion = ensureCompanion();
     const reaction = loadReaction();
     const reactionText =
@@ -1047,23 +1071,17 @@ server.tool(
         saveCompanionSlot(buddySlot, companion);
       }
 
-      const card = renderCompanionCardMarkdown(
-        bones, buddyName, companion.personality,
-        pityTriggered ? `*${buddyName} hatches* (pity!)` : `*${buddyName} hatches*`,
-      );
-
+      // Return rarity reveal + personality prompt — the full card is shown
+      // later via buddy_show after the personality has been set.
       results.push([
         flavor,
         "",
         `### ${rarityLabel}!`,
-        "",
-        card,
         pityTriggered ? "\n*Pity system activated!*" : "",
       ].filter(Boolean).join("\n"));
 
       w = loadWallet();
-      results.push(`\n---\n**Coins remaining:** ${w.coins}`);
-      results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
+      results.push(`\n**Coins remaining:** ${w.coins}`);
 
       const seed = inspirationSeed(userId);
       results.push(buildPersonalityBlock(bones, buddyName, seed, buddySlot));
