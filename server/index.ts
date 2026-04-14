@@ -22,6 +22,7 @@ import {
   type Rarity,
   type StatName,
   type Companion,
+  type BuddyBones,
 } from "./engine.ts";
 import {
   loadCompanion,
@@ -38,6 +39,7 @@ import {
   unusedName,
   loadCompanionSlot,
   saveCompanionSlot,
+  updateCompanionSlot,
   deleteCompanionSlot,
   listCompanionSlots,
   setBuddyStatusLine,
@@ -52,6 +54,7 @@ import {
 } from "./path.ts";
 import {
   getReaction, generatePersonalityPrompt,
+  buildPersonalityBlock, inspirationSeed,
 } from "./reactions.ts";
 import { renderCompanionCardMarkdown } from "./art.ts";
 import {
@@ -60,7 +63,7 @@ import {
 } from "./achievements.ts";
 import {
   loadWallet, saveWallet, earnCoins, spendCoins, canAfford,
-  PULL_COST, MULTI_PULL_COUNT, MULTI_PULL_COST,
+  PULL_COST,
 } from "./wallet.ts";
 import { pullBuddy, updatePity, hatchFlavorText } from "./pull.ts";
 import { getAvailablePacks, getCurrentRotationPack, getPackSpeciesIds } from "./packs.ts";
@@ -125,7 +128,7 @@ function ensureCompanion(): Companion {
     userId,
   };
   const slot = slugify(name);
-  saveCompanionSlot(companion, slot);
+  saveCompanionSlot(slot, companion);
   saveActiveSlot(slot);
   writeStatusState(companion);
 
@@ -287,15 +290,36 @@ server.tool(
 
 server.tool(
   "buddy_set_personality",
-  "Set a custom personality description for your buddy",
+  "Set a custom personality description for a buddy. Targets the active buddy by default, or a specific buddy by slot name.",
   {
     personality: z
       .string()
       .min(1)
       .max(500)
       .describe("Personality description (1-500 chars)"),
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to update. If omitted, updates the active buddy."),
   },
-  async ({ personality }) => {
+  async ({ personality, slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      target.personality = personality;
+      updateCompanionSlot(slot, target);
+      incrementEvent("commands_run", 1, slot);
+      return {
+        content: [{ type: "text", text: `Personality updated for ${target.name} [${slot}].` }],
+      };
+    }
+
     const companion = ensureCompanion();
     companion.personality = personality;
     saveCompanion(companion);
@@ -671,7 +695,7 @@ server.tool(
   async ({ slot }) => {
     const companion = ensureCompanion();
     const targetSlot = slot ? slugify(slot) : slugify(companion.name);
-    saveCompanionSlot(companion, targetSlot);
+    saveCompanionSlot(targetSlot, companion);
     saveActiveSlot(targetSlot);
     return {
       content: [
@@ -816,15 +840,16 @@ server.tool(
       };
     }
 
+    const seed = inspirationSeed(userId);
     const companion: Companion = {
       bones,
       name: buddyName,
-      personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
+      personality: `A ${bones.rarity} ${bones.species} — personality emerging...`,
       hatchedAt: Date.now(),
       userId,
     };
 
-    saveCompanionSlot(companion, slot);
+    saveCompanionSlot(slot, companion);
     saveActiveSlot(slot);
     saveReaction(`*${buddyName} hatches*`, "pick");
     writeStatusState(companion, `*${buddyName} hatches*`);
@@ -836,7 +861,8 @@ server.tool(
       `*${buddyName} hatches*`,
     );
 
-    return { content: [{ type: "text", text: card }] };
+    const personalityBlock = buildPersonalityBlock(bones, buddyName, seed, slot);
+    return { content: [{ type: "text", text: card + personalityBlock }] };
   },
 );
 
@@ -866,7 +892,7 @@ server.tool(
     parts.push(`**Total earned:** ${w.totalEarned} | **Total spent:** ${w.totalSpent}`);
     parts.push(`**Pulls completed:** ${w.pullCount}`);
     parts.push("");
-    parts.push(`**Pull cost:** ${PULL_COST} coins (${MULTI_PULL_COUNT}-pull: ${MULTI_PULL_COST})`);
+    parts.push(`**Pull cost:** ${PULL_COST} coins`);
     parts.push("");
     parts.push(`**Pity progress:**`);
     parts.push(`- Epic guarantee: ${w.pityEpic}/50 (${pityEpicPct}%)`);
@@ -946,9 +972,6 @@ server.tool(
   "buddy_pull",
   "Spend coins to pull a random buddy from the gacha. Returns a suspenseful egg-hatch reveal followed by the buddy card. Use `! bun run pull` in the terminal for the animated experience.",
   {
-    count: z.number().int().min(1).max(10).optional().describe(
-      "Number of pulls (1-10). Single pull costs 50 coins, 10-pull costs 450.",
-    ),
     keep: z.boolean().optional().describe(
       "If true (default), keep the pulled buddy. If false, discard it after reveal.",
     ),
@@ -959,7 +982,7 @@ server.tool(
       "Pack to pull from (e.g. 'core', 'insects'). If omitted, pulls from all available packs.",
     ),
   },
-  async ({ count, keep, name, pack }) => {
+  async ({ keep, name, pack }) => {
     if (!isGachaMode()) {
       return {
         content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
@@ -980,91 +1003,89 @@ server.tool(
       }
     }
 
-    const pullCount = count ?? 1;
-    const totalCost = pullCount === MULTI_PULL_COUNT ? MULTI_PULL_COST
-      : pullCount * PULL_COST;
-
-    if (!canAfford(totalCost)) {
+    if (!canAfford(PULL_COST)) {
       const w = loadWallet();
       return {
         content: [{
           type: "text",
-          text: `Not enough coins! You have **${w.coins}** coins but need **${totalCost}** for ${pullCount} pull${pullCount > 1 ? "s" : ""}.\n\n*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`,
+          text: `Not enough coins! You have **${w.coins}** coins but need **${PULL_COST}** for a pull.\n\n*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`,
         }],
       };
     }
 
-    spendCoins(totalCost);
+    spendCoins(PULL_COST);
     const shouldKeep = keep !== false;
+
+    let w = loadWallet();
+    const { bones, userId, pityTriggered } = pullBuddy(w, pack);
+
+    // Update pity counters and save
+    w = loadWallet();
+    updatePity(w, bones.rarity);
+    saveWallet(w);
+
+    incrementEvent("pulls_total", 1);
+    if (bones.rarity === "legendary") incrementEvent("legendary_pulls", 1);
+    if (bones.shiny) incrementEvent("shiny_pulls", 1);
+
+    // Build the suspense reveal
+    const flavor = hatchFlavorText(bones.rarity, bones.shiny);
+    const rarityLabel = bones.rarity.toUpperCase();
+    const buddyName = name ?? unusedName();
     const results: string[] = [];
 
-    for (let i = 0; i < pullCount; i++) {
-      let w = loadWallet();
-      const { bones, userId, pityTriggered } = pullBuddy(w, pack);
-
-      // Update pity counters and save
-      w = loadWallet();
-      updatePity(w, bones.rarity);
-      saveWallet(w);
-
-      incrementEvent("pulls_total", 1);
-      if (bones.rarity === "legendary") incrementEvent("legendary_pulls", 1);
-      if (bones.shiny) incrementEvent("shiny_pulls", 1);
-
-      // Build the suspense reveal
-      const flavor = hatchFlavorText(bones.rarity, bones.shiny);
-      const rarityLabel = bones.rarity.toUpperCase();
-
-      const buddyName = (pullCount === 1 && name) ? name : unusedName();
-
-      if (shouldKeep) {
-        const companion: Companion = {
-          bones,
-          name: buddyName,
-          personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
-          hatchedAt: Date.now(),
-          userId,
-        };
-        const buddySlot = slugify(buddyName);
-        if (!loadCompanionSlot(buddySlot)) {
-          saveCompanionSlot(companion, buddySlot);
-        }
-
-        const card = renderCompanionCardMarkdown(
-          bones, buddyName, companion.personality,
-          pityTriggered ? `*${buddyName} hatches* (pity!)` : `*${buddyName} hatches*`,
-        );
-
-        results.push([
-          pullCount > 1 ? `---\n#### Pull ${i + 1}/${pullCount}` : "",
-          flavor,
-          "",
-          `### ${rarityLabel}!`,
-          "",
-          card,
-          pityTriggered ? "\n*Pity system activated!*" : "",
-        ].filter(Boolean).join("\n"));
-      } else {
-        const card = renderCompanionCardMarkdown(
-          bones, buddyName, `A ${bones.rarity} ${bones.species}.`,
-        );
-        results.push([
-          pullCount > 1 ? `---\n#### Pull ${i + 1}/${pullCount}` : "",
-          flavor,
-          "",
-          `### ${rarityLabel}!`,
-          "",
-          card,
-          "\n*Discarded — the buddy vanishes into the mist.*",
-        ].filter(Boolean).join("\n"));
+    if (shouldKeep) {
+      const companion: Companion = {
+        bones,
+        name: buddyName,
+        personality: `A ${bones.rarity} ${bones.species} — personality emerging...`,
+        hatchedAt: Date.now(),
+        userId,
+      };
+      const buddySlot = slugify(buddyName);
+      if (!loadCompanionSlot(buddySlot)) {
+        saveCompanionSlot(buddySlot, companion);
       }
+
+      const card = renderCompanionCardMarkdown(
+        bones, buddyName, companion.personality,
+        pityTriggered ? `*${buddyName} hatches* (pity!)` : `*${buddyName} hatches*`,
+      );
+
+      results.push([
+        flavor,
+        "",
+        `### ${rarityLabel}!`,
+        "",
+        card,
+        pityTriggered ? "\n*Pity system activated!*" : "",
+      ].filter(Boolean).join("\n"));
+
+      w = loadWallet();
+      results.push(`\n---\n**Coins remaining:** ${w.coins}`);
+      results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
+
+      const seed = inspirationSeed(userId);
+      results.push(buildPersonalityBlock(bones, buddyName, seed, buddySlot));
+    } else {
+      const card = renderCompanionCardMarkdown(
+        bones, buddyName, `A ${bones.rarity} ${bones.species}.`,
+      );
+      results.push([
+        flavor,
+        "",
+        `### ${rarityLabel}!`,
+        "",
+        card,
+        "\n*Discarded — the buddy vanishes into the mist.*",
+      ].filter(Boolean).join("\n"));
+
+      w = loadWallet();
+      results.push(`\n---\n**Coins remaining:** ${w.coins}`);
+      results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
     }
 
     checkAndAward(slot);
-
-    const w = loadWallet();
-    results.push(`\n---\n**Coins remaining:** ${w.coins}`);
-    results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
 
     return { content: [{ type: "text", text: results.join("\n") }] };
   },

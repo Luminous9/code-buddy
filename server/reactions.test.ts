@@ -17,8 +17,11 @@ import {
   getReaction,
   generateFallbackName,
   generatePersonalityPrompt,
+  buildPersonalityBlock,
+  inspirationSeed,
 } from "./reactions.ts";
 import { SPECIES, RARITIES, STAT_NAMES } from "./engine.ts";
+import type { BuddyBones } from "./engine.ts";
 
 // ─── getReaction ──────────────────────────────────────────────────────────
 
@@ -271,5 +274,108 @@ describe("generatePersonalityPrompt", () => {
     for (const n of STAT_NAMES) {
       expect(prompt).toContain(`${n}:50`);
     }
+  });
+
+  test("seed makes vibe word selection deterministic", () => {
+    const a = generatePersonalityPrompt("owl", "rare", sampleStats, false, 42);
+    const b = generatePersonalityPrompt("owl", "rare", sampleStats, false, 42);
+    expect(a).toBe(b);
+  });
+
+  test("different seeds produce different vibe words", () => {
+    const a = generatePersonalityPrompt("owl", "rare", sampleStats, false, 1);
+    const b = generatePersonalityPrompt("owl", "rare", sampleStats, false, 999999);
+    const vibesA = a.match(/Inspiration words: (.+)/)![1];
+    const vibesB = b.match(/Inspiration words: (.+)/)![1];
+    expect(vibesA).not.toBe(vibesB);
+  });
+
+  test("unseeded calls still produce valid vibes (Math.random fallback)", () => {
+    for (let i = 0; i < 10; i++) {
+      const prompt = generatePersonalityPrompt("cat", "common", sampleStats, false);
+      const match = prompt.match(/Inspiration words: (.+)/);
+      expect(match).not.toBeNull();
+      expect(match![1].split(",").map(w => w.trim()).length).toBe(4);
+    }
+  });
+});
+
+// ─── inspirationSeed ─────────────────────────────────────────────────────
+
+describe("inspirationSeed", () => {
+  test("returns a deterministic integer for the same userId", () => {
+    const a = inspirationSeed("user-abc-123");
+    const b = inspirationSeed("user-abc-123");
+    expect(a).toBe(b);
+    expect(Number.isInteger(a)).toBe(true);
+  });
+
+  test("different userIds produce different seeds", () => {
+    const a = inspirationSeed("user-abc-123");
+    const b = inspirationSeed("user-xyz-789");
+    expect(a).not.toBe(b);
+  });
+
+  test("seed is in the expected range [0, 1e9)", () => {
+    for (let i = 0; i < 100; i++) {
+      const seed = inspirationSeed(`user-${i}`);
+      expect(seed).toBeGreaterThanOrEqual(0);
+      expect(seed).toBeLessThan(1e9);
+    }
+  });
+});
+
+// ─── buildPersonalityBlock ──────────────────────────────────────────────
+
+describe("buildPersonalityBlock", () => {
+  const sampleBones: BuddyBones = {
+    rarity: "rare",
+    species: "owl",
+    eye: "·",
+    hat: "crown",
+    shiny: false,
+    stats: { DEBUGGING: 42, PATIENCE: 73, CHAOS: 12, WISDOM: 88, SNARK: 55 },
+    peak: "WISDOM",
+    dump: "CHAOS",
+  };
+
+  test("includes buddy_set_personality instruction", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain("buddy_set_personality");
+  });
+
+  test("includes the slot name in the instruction", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain('slot="miso"');
+  });
+
+  test("includes buddy_rename instruction with the current name", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain("buddy_rename");
+    expect(block).toContain("Miso");
+  });
+
+  test("includes personality-prompt delimiters", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain("<personality-prompt>");
+    expect(block).toContain("</personality-prompt>");
+  });
+
+  test("includes species and rarity from bones in the prompt", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain("Species: owl");
+    expect(block).toContain("Rarity: RARE");
+  });
+
+  test("is deterministic for the same seed", () => {
+    const a = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    const b = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(a).toBe(b);
+  });
+
+  test("includes the JSON output instruction", () => {
+    const block = buildPersonalityBlock(sampleBones, "Miso", 42, "miso");
+    expect(block).toContain('"name"');
+    expect(block).toContain('"personality"');
   });
 });

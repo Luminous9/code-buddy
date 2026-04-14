@@ -2,16 +2,15 @@
 /**
  * cli/pull.ts — gacha pull with egg hatch animation
  *
- * Phases: confirm → egg → wobble → crack → reveal → card → decide → naming
+ * Phases: confirm → egg → wobble (waits for soul-gen) → crack → reveal → decide
  *
  * Keys:
  *   confirm:  [enter] pull  [q] quit
- *   decide:   [k] keep  [d] discard
- *   naming:   type name  [enter] save  [esc] cancel → discard
+ *   decide:   [k] keep  [d] discard  [q] quit
  */
 
 import {
-  loadActiveSlot, saveActiveSlot, saveCompanionSlot,
+  loadActiveSlot, saveCompanionSlot,
   slugify, unusedName, writeStatusState, loadCompanionSlot,
   isGachaMode,
 } from "../server/state.ts";
@@ -30,6 +29,8 @@ import { pullBuddy, updatePity } from "../server/pull.ts";
 import { incrementEvent, checkAndAward } from "../server/achievements.ts";
 import { saveReaction } from "../server/state.ts";
 import { getAvailablePacks, type Pack } from "../server/packs.ts";
+import { generatePersonalityPrompt, inspirationSeed } from "../server/reactions.ts";
+import { execFile } from "child_process";
 
 // ─── ANSI ─────────────────────────────────────────────────────────────────────
 
@@ -142,7 +143,12 @@ const EGG_OPEN = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-type Phase = "confirm" | "egg" | "wobble" | "crack" | "reveal" | "card" | "decide" | "naming";
+type Phase = "confirm" | "egg" | "wobble" | "crack" | "reveal" | "card" | "decide";
+
+interface SoulResult {
+  name: string;
+  personality: string;
+}
 
 interface State {
   phase: Phase;
@@ -150,12 +156,15 @@ interface State {
   bones: BuddyBones | null;
   userId: string;
   pityTriggered: boolean;
-  nameInput: string;
   animFrame: number;
   animStart: number;
   message: string;
   availablePacks: Pack[];
   selectedPack: number; // index into availablePacks, 0 = first pack
+  pendingSoul: Promise<SoulResult | null> | null;
+  resolvedSoul: SoulResult | null;
+  soulDone: boolean;
+  fallbackName: string; // pre-generated fallback if soul-gen fails
 }
 
 function freshState(): State {
@@ -166,12 +175,15 @@ function freshState(): State {
     bones: null,
     userId: "",
     pityTriggered: false,
-    nameInput: "",
     animFrame: 0,
     animStart: 0,
     message: "",
     availablePacks: packs,
     selectedPack: 0,
+    pendingSoul: null,
+    resolvedSoul: null,
+    soulDone: false,
+    fallbackName: "",
   };
 }
 
@@ -223,9 +235,6 @@ function drawScreen(s: State): void {
     case "card":
     case "decide":
       out += drawCard(s, cols);
-      break;
-    case "naming":
-      out += drawNaming(s, cols);
       break;
   }
 
@@ -387,10 +396,20 @@ function drawReveal(s: State, cols: number): string {
   return lines.join("\n");
 }
 
+function buddyName(s: State): string {
+  return s.resolvedSoul?.name ?? s.fallbackName;
+}
+
+function buddyPersonality(s: State): string {
+  const bones = s.bones!;
+  return s.resolvedSoul?.personality
+    ?? `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`;
+}
+
 function drawCard(s: State, cols: number): string {
   const bones = s.bones!;
-  const name = s.nameInput || "???";
-  const personality = `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`;
+  const name = buddyName(s);
+  const personality = buddyPersonality(s);
   const reaction = s.pityTriggered ? `*${name} hatches* (pity!)` : `*${name} hatches*`;
 
   const card = renderCompanionCard(bones, name, personality, reaction, 0, W);
@@ -410,25 +429,6 @@ function drawCard(s: State, cols: number): string {
   return lines.join("\n");
 }
 
-function drawNaming(s: State, cols: number): string {
-  const bones = s.bones!;
-  const name = s.nameInput || "";
-  const personality = `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`;
-
-  const card = renderCompanionCard(bones, name || "???", personality, undefined, 0, W);
-  const cardLines = card.split("\n");
-
-  const lines: string[] = [];
-  for (const line of cardLines) {
-    lines.push(center(line, cols));
-  }
-
-  lines.push("");
-  lines.push(center(`${B}Name your buddy:${N} ${s.nameInput}\u2588`, cols));
-  lines.push(center(`${D}(1-14 chars, [enter] to confirm, [esc] to discard)${N}`, cols));
-
-  return lines.join("\n");
-}
 
 // ─── Animation loop ──────────────────────────────────────────────────────────
 
@@ -441,7 +441,9 @@ function startAnimation(s: State): void {
 
     if (s.phase === "egg" || s.phase === "wobble") {
       const dur = wobbleDurationMs(s.bones!.rarity);
-      if (elapsed >= dur) {
+      // Hold the wobble until both the minimum rarity duration has passed
+      // AND the soul generation has finished (success or failure)
+      if (elapsed >= dur && s.soulDone) {
         s.phase = "crack";
         s.animStart = Date.now();
       }
@@ -466,6 +468,53 @@ function stopAnimation(): void {
     clearInterval(animTimer);
     animTimer = null;
   }
+}
+
+// ─── Soul generation via claude CLI ──────────────────────────────────────────
+
+function generateSoul(bones: BuddyBones, userId: string): Promise<SoulResult | null> {
+  const seed = inspirationSeed(userId);
+  const prompt = generatePersonalityPrompt(
+    bones.species, bones.rarity, bones.stats, bones.shiny, seed,
+  );
+
+  return new Promise((resolve) => {
+    const child = execFile(
+      "claude",
+      [
+        "-p",
+        "--model", "sonnet",
+        "--output-format", "json",
+        "--max-turns", "1",
+        prompt,
+      ],
+      { timeout: 30_000, encoding: "utf-8" },
+      (err, stdout) => {
+        if (err) { resolve(null); return; }
+        try {
+          // --output-format json returns { result: "..." } with the model's text
+          const outer = JSON.parse(stdout.trim());
+          const text: string = typeof outer === "string" ? outer : outer.result ?? "";
+          // The model may wrap JSON in ```json ... ``` fences — strip them
+          const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+          const jsonStr = fenceMatch ? fenceMatch[1].trim() : text.trim();
+          // Parse the JSON object with name + personality
+          const soul = JSON.parse(jsonStr) as SoulResult;
+          if (soul.name && soul.personality
+            && soul.name.length <= 14
+            && soul.personality.length <= 500) {
+            resolve(soul);
+            return;
+          }
+          resolve(null);
+        } catch {
+          resolve(null);
+        }
+      },
+    );
+    // If claude isn't installed or PATH is wrong, catch spawn errors
+    child.on("error", () => resolve(null));
+  });
 }
 
 // ─── Pull execution ──────────────────────────────────────────────────────────
@@ -494,10 +543,19 @@ function executePull(s: State): void {
   s.bones = bones;
   s.userId = userId;
   s.pityTriggered = pityTriggered;
-  s.nameInput = "";
+  s.fallbackName = unusedName();
   s.phase = "egg";
   s.animStart = Date.now();
   s.wallet = loadWallet();
+
+  // Fire off soul generation in parallel with the animation
+  s.resolvedSoul = null;
+  s.soulDone = false;
+  s.pendingSoul = generateSoul(bones, userId).then((soul) => {
+    s.resolvedSoul = soul;
+    s.soulDone = true;
+    return soul;
+  });
 
   startAnimation(s);
 }
@@ -506,36 +564,47 @@ function executePull(s: State): void {
 
 function keepBuddy(s: State): void {
   const bones = s.bones!;
-  const buddyName = s.nameInput || unusedName();
-  const slot = slugify(buddyName);
+  const name = buddyName(s);
+  const slot = slugify(name);
 
   if (loadCompanionSlot(slot)) {
-    s.message = `Slot "${slot}" already exists! Pick a different name.`;
-    s.phase = "naming";
-    drawScreen(s);
-    return;
+    // Slot collision with generated name — append a suffix
+    let suffix = 2;
+    let altSlot = `${slot}-${suffix}`;
+    while (loadCompanionSlot(altSlot)) { suffix++; altSlot = `${slot}-${suffix}`; }
+    const altName = `${name}-${suffix}`;
+    const companion: Companion = {
+      bones,
+      name: altName,
+      personality: buddyPersonality(s),
+      hatchedAt: Date.now(),
+      userId: s.userId,
+    };
+    saveCompanionSlot(altSlot, companion);
+    s.message = `${GN}\u2713 ${altName} saved to menagerie!${N}`;
+  } else {
+    const companion: Companion = {
+      bones,
+      name,
+      personality: buddyPersonality(s),
+      hatchedAt: Date.now(),
+      userId: s.userId,
+    };
+    saveCompanionSlot(slot, companion);
+    s.message = `${GN}\u2713 ${name} saved to menagerie!${N}`;
   }
 
-  const companion: Companion = {
-    bones,
-    name: buddyName,
-    personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
-    hatchedAt: Date.now(),
-    userId: s.userId,
-  };
-
-  saveCompanionSlot(companion, slot);
-  saveActiveSlot(slot);
-  saveReaction(`*${buddyName} hatches*`, "pull");
-  writeStatusState(companion, `*${buddyName} hatches*`);
+  saveReaction(`*${name} hatches*`, "pull");
 
   const activeS = loadActiveSlot();
   checkAndAward(activeS);
 
-  s.message = `${GN}\u2713 ${buddyName} saved to menagerie!${N}`;
   s.wallet = loadWallet();
   s.phase = "confirm";
   s.bones = null;
+  s.pendingSoul = null;
+  s.resolvedSoul = null;
+  s.soulDone = false;
   drawScreen(s);
 }
 
@@ -544,6 +613,9 @@ function discardBuddy(s: State): void {
   s.wallet = loadWallet();
   s.phase = "confirm";
   s.bones = null;
+  s.pendingSoul = null;
+  s.resolvedSoul = null;
+  s.soulDone = false;
   drawScreen(s);
 }
 
@@ -588,41 +660,12 @@ function handleKey(key: string, s: State): boolean {
 
     case "decide": {
       if (key === "k" || key === "\r" || key === "\n") {
-        s.phase = "naming";
-        s.nameInput = "";
-        drawScreen(s);
+        keepBuddy(s);
       } else if (key === "d") {
         discardBuddy(s);
       } else if (key === "q") {
         discardBuddy(s);
         return true;
-      }
-      return false;
-    }
-
-    case "naming": {
-      if (key === "\x1b") {
-        // Esc — discard
-        discardBuddy(s);
-        return false;
-      }
-      if (key === "\r" || key === "\n") {
-        // Enter — save
-        keepBuddy(s);
-        return false;
-      }
-      if (key === "\x7f" || key === "\b") {
-        // Backspace
-        s.nameInput = s.nameInput.slice(0, -1);
-        s.message = "";
-        drawScreen(s);
-        return false;
-      }
-      // Printable character
-      if (key.length === 1 && key >= " " && s.nameInput.length < 14) {
-        s.nameInput += key;
-        s.message = "";
-        drawScreen(s);
       }
       return false;
     }

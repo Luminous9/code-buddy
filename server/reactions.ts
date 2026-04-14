@@ -2,7 +2,9 @@
  * Reaction templates — species-aware buddy responses to events
  */
 
-import type { Species, Rarity, StatName } from "./engine.ts";
+import type { Species, Rarity, StatName, BuddyStats } from "./engine.ts";
+import { mulberry32, hashString, SALT } from "./engine.ts";
+import type { BuddyBones } from "./engine.ts";
 import { buildSpeciesReactions, type ReactionReason } from "./packs.ts";
 
 interface ReactionPool {
@@ -122,12 +124,14 @@ export function generateFallbackName(): string {
 export function generatePersonalityPrompt(
   species: Species,
   rarity: Rarity,
-  stats: Record<string, number>,
+  stats: BuddyStats | Record<string, number>,
   shiny: boolean,
+  seed?: number,
 ): string {
+  const rng = seed != null ? mulberry32(seed) : Math.random;
   const vibes: string[] = [];
   for (let i = 0; i < 4; i++) {
-    vibes.push(VIBE_WORDS[Math.floor(Math.random() * VIBE_WORDS.length)]);
+    vibes.push(VIBE_WORDS[Math.floor(rng() * VIBE_WORDS.length)]);
   }
 
   const statStr = Object.entries(stats).map(([k, v]) => `${k}:${v}`).join(", ");
@@ -144,4 +148,48 @@ export function generatePersonalityPrompt(
     "",
     "Return JSON: {\"name\": \"1-14 chars\", \"personality\": \"2-3 sentences describing behavior\"}",
   ].filter(Boolean).join("\n");
+}
+
+// ─── Inspiration seed — deterministic from userId, like claude-code's Roll ──
+
+export function inspirationSeed(userId: string): number {
+  const rng = mulberry32(hashString(userId + SALT));
+  // Burn the same number of draws that generateBones consumes so the seed
+  // sits at the same PRNG position as claude-code's inspirationSeed.
+  // generateBones: rarity(1) + species(1) + eye(1) + hat(1) + shiny(1)
+  //   + peak(1) + dump(1..N) + stats(5×1) = ~12 draws minimum.
+  // Rather than mirror exact draw count (which varies), we hash a separate
+  // salt so the seed is stable regardless of bones-generation changes.
+  return Math.floor(mulberry32(hashString(userId + SALT + "-soul"))() * 1e9);
+}
+
+// ─── Personality block — appended to tool responses for LLM generation ──────
+
+export function buildPersonalityBlock(
+  bones: BuddyBones,
+  currentName: string,
+  seed: number,
+  slot: string,
+): string {
+  const prompt = generatePersonalityPrompt(
+    bones.species,
+    bones.rarity,
+    bones.stats,
+    bones.shiny,
+    seed,
+  );
+  return [
+    "",
+    "---",
+    "**Personality Generation**",
+    "",
+    "This buddy hatched with a placeholder personality. Generate a unique one now.",
+    "",
+    "<personality-prompt>",
+    prompt,
+    "</personality-prompt>",
+    "",
+    `Call \`buddy_set_personality\` with the personality text (2-3 sentences) and slot="${slot}".`,
+    `If the generated name fits better than "${currentName}", also call \`buddy_rename\`.`,
+  ].join("\n");
 }

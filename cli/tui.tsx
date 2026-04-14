@@ -1895,7 +1895,7 @@ function App() {
             hatchedAt: Date.now(),
             userId: chosen.userId,
           };
-          saveCompanionSlot(companion, slot);
+          saveCompanionSlot(slot, companion);
           saveActiveSlot(slot);
           writeStatusState(companion, `*${name} arrives*`);
           setMessage(`✓ ${name} saved to slot "${slot}"`);

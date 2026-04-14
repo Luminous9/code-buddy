@@ -372,7 +372,7 @@ function onKey(key: string, s: State): boolean {
           personality: `A ${r.bones.rarity} ${r.bones.species} who watches code with quiet intensity.`,
           hatchedAt: Date.now(), userId: r.userId,
         };
-        saveCompanionSlot(companion, slot);
+        saveCompanionSlot(slot, companion);
         saveActiveSlot(slot);
         writeStatusState(companion, `*${name} arrives*`);
         s.message = `✓ ${name} saved to slot "${slot}" and set as active!`;

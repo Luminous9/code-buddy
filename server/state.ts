@@ -14,6 +14,7 @@
  *
  * Rules:
  *   - saveCompanionSlot()  APPENDS only — throws if the slot already exists
+ *   - updateCompanionSlot() UPDATES an existing slot — throws if slot doesn't exist
  *   - saveCompanion()      UPDATES the currently-active slot (rename / personality)
  *   - All manifest writes are atomic (write tmp -> rename)
  *
@@ -167,7 +168,7 @@ export function loadCompanionSlot(slot: string): Companion | null {
  * APPEND a new companion to the manifest.
  * Throws if the slot already exists — use saveCompanion() to update an existing buddy.
  */
-export function saveCompanionSlot(companion: Companion, slot: string): void {
+export function saveCompanionSlot(slot: string, companion: Companion): void {
   const m = loadManifest();
   if (m.companions[slot]) {
     throw new Error(`Slot "${slot}" already exists. Choose a different name.`);

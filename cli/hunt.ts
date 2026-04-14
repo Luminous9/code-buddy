@@ -158,7 +158,7 @@ ${CYAN}╚═══════════════════════�
     userId: chosen.userId,
   };
 
-  saveCompanionSlot(companion, slot);
+  saveCompanionSlot(slot, companion);
   saveActiveSlot(slot);
   writeStatusState(companion, `*${chosenName} arrives*`);
 
