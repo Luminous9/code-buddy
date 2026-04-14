@@ -5,7 +5,7 @@
 
 export const SALT = "friend-2026-401";
 
-import { getActiveSpecies, getCoreSpecies, buildFaceTemplates } from "./packs.ts";
+import { getActiveSpecies, getCoreSpecies, buildFaceTemplates, renderHatLine } from "./packs.ts";
 
 export const SPECIES: string[] = getActiveSpecies();
 
@@ -78,16 +78,6 @@ export const HATS = [
 ] as const;
 export type Hat = (typeof HATS)[number];
 
-export const HAT_ART: Record<Hat, string> = {
-  none: "",
-  crown: "  \\^^^/  ",
-  tophat: "  [___]  ",
-  propeller: "   -+-   ",
-  halo: "  (   )  ",
-  wizard: "   /^\\   ",
-  beanie: "  (___)  ",
-  tinyduck: "   ,>    ",
-};
 
 export interface BuddyStats {
   DEBUGGING: number;
@@ -293,7 +283,7 @@ export function renderFace(species: Species, eye: Eye): string {
 
 export function renderBuddy(bones: BuddyBones): string {
   const face = renderFace(bones.species, bones.eye);
-  const hat = HAT_ART[bones.hat];
+  const hat = renderHatLine(bones.hat, bones.species, 0);
   const shiny = bones.shiny ? "\u2728 " : "";
   const stars = RARITY_STARS[bones.rarity];
 

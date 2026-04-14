@@ -29,6 +29,7 @@ export interface PackSpecies {
   id: string;
   art: string[][];               // 3 frames × 5 lines each (line 0 = hat slot)
   face: string;                  // compact face template with {E}
+  hatOffset?: number[];          // per-frame hat shift relative to center (e.g. [-1, -1, 0])
   reactions?: Partial<Record<ReactionReason, string[]>>;
 }
 
@@ -155,4 +156,47 @@ export function buildSpeciesReactions(): Record<string, Partial<Record<ReactionR
     if (s.reactions) reactions[s.id] = s.reactions;
   }
   return reactions;
+}
+
+// ─── Hat rendering ──────────────────────────────────────────────────────────
+
+/** Bare hat glyphs (no padding). */
+export const BARE_HATS: Record<string, string> = {
+  none:      "",
+  crown:     "\\^^^/",
+  tophat:    "[___]",
+  propeller: "-+-",
+  halo:      "(   )",
+  wizard:    "/^\\",
+  beanie:    "(___)",
+  tinyduck:  ",>",
+};
+
+/** Get the hat offset for a species on a given frame. */
+export function getHatOffset(speciesId: string, frame: number): number {
+  const species = getActiveSpeciesData().find(s => s.id === speciesId);
+  if (!species?.hatOffset) return 0;
+  return species.hatOffset[frame % species.hatOffset.length] ?? 0;
+}
+
+/**
+ * Render a hat line centered on the species art width, with per-species offset.
+ * Returns an empty string for hat "none".
+ */
+export function renderHatLine(hat: string, speciesId: string, frame: number = 0, artWidth?: number): string {
+  const bare = BARE_HATS[hat];
+  if (!bare) return "";
+
+  // Determine art width from rendered species data ({E} → single char)
+  const species = getActiveSpeciesData().find(s => s.id === speciesId);
+  const w = artWidth ?? (species
+    ? Math.max(...species.art.flat().map(l => l.replace(/\{E\}/g, ".").length))
+    : 12);
+
+  const hatLen = bare.length;
+  const offset = getHatOffset(speciesId, frame);
+  const center = Math.floor((w - hatLen) / 2) + offset;
+  const pad = Math.max(0, center);
+
+  return " ".repeat(pad) + bare;
 }

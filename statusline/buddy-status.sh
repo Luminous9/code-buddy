@@ -231,16 +231,49 @@ if [ "$BLINK" -eq 1 ]; then
 fi
 
 # ─── Hat ──────────────────────────────────────────────────────────────────────
-HAT_LINE=""
+# --- BEGIN GENERATED HAT ART ---
+BARE_HAT=""
 case "$HAT" in
-  crown)     HAT_LINE=" \\^^^/" ;;
-  tophat)    HAT_LINE=" [___]" ;;
-  propeller) HAT_LINE="  -+-" ;;
-  halo)      HAT_LINE=" (   )" ;;
-  wizard)    HAT_LINE="  /^\\" ;;
-  beanie)    HAT_LINE=" (___)" ;;
-  tinyduck)  HAT_LINE="  ,>" ;;
+  crown) BARE_HAT="\\^^^/" ;;
+  tophat) BARE_HAT="[___]" ;;
+  propeller) BARE_HAT="-+-" ;;
+  halo) BARE_HAT="(   )" ;;
+  wizard) BARE_HAT="/^\\" ;;
+  beanie) BARE_HAT="(___)" ;;
+  tinyduck) BARE_HAT=",>" ;;
 esac
+
+HAT_LINE=""
+if [ -n "$BARE_HAT" ]; then
+  ART_W=12
+  HAT_OFFSET=0
+  case "$SPECIES" in
+    duck) ART_W=12 ;;
+    goose) ART_W=12 ;;
+    blob) ART_W=12 ;;
+    cat) ART_W=12 ;;
+    dragon) ART_W=12 ;;
+    octopus) ART_W=12 ;;
+    owl) ART_W=12 ;;
+    penguin) ART_W=12 ;;
+    turtle) ART_W=12 ;;
+    snail) ART_W=12 ;;
+    ghost) ART_W=12 ;;
+    axolotl) ART_W=12 ;;
+    capybara) ART_W=12 ;;
+    cactus) ART_W=12 ;;
+    robot) ART_W=12 ;;
+    rabbit) ART_W=12 ;;
+    mushroom) ART_W=12 ;;
+    chonk) ART_W=12 ;;
+    spider) ART_W=14 ;;
+  esac
+  BARE_LEN=${#BARE_HAT}
+  PAD=$(( (ART_W - BARE_LEN) / 2 + HAT_OFFSET ))
+  [ "$PAD" -lt 0 ] && PAD=0
+  HAT_LINE="$(printf '%*s%s' "$PAD" '' "$BARE_HAT")"
+fi
+# --- END GENERATED HAT ART ---
 
 # ─── Reaction bubble (read from per-session file, with TTL check) ────────────
 BUBBLE=""

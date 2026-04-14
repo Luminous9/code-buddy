@@ -6,25 +6,14 @@
  * {E} is replaced with the eye character at render time.
  */
 
-import type { Species, Eye, Hat, Rarity, StatName, BuddyBones } from "./engine.ts";
-import { buildSpeciesArt } from "./packs.ts";
+import type { Species, Eye, Rarity, StatName, BuddyBones } from "./engine.ts";
+import { buildSpeciesArt, renderHatLine } from "./packs.ts";
 
 // ─── Species art: 3 frames × 5 lines each (built from packs) ───────────────
 
 export const SPECIES_ART: Record<string, string[][]> = buildSpeciesArt();
 
-// ─── Hat art ────────────────────────────────────────────────────────────────
-
-export const HAT_ART: Record<Hat, string> = {
-  none:      "",
-  crown:     "   \\^^^/    ",
-  tophat:    "   [___]    ",
-  propeller: "    -+-     ",
-  halo:      "   (   )    ",
-  wizard:    "    /^\\     ",
-  beanie:    "   (___)    ",
-  tinyduck:  "    ,>      ",
-};
+// Hat art is now centralized in packs.ts (BARE_HATS + renderHatLine)
 
 // ─── Rarity ANSI colors ────────────────────────────────────────────────────
 
@@ -98,10 +87,10 @@ export function renderCompanionCard(
   const shiny = bones.shiny ? `${SHINY_COLOR}\u2728 ${NC}` : "";
   const art = getArtFrame(bones.species, bones.eye, frame);
 
-  // Hat: replace first empty art line
-  const hatLine = HAT_ART[bones.hat];
-  if (hatLine && !art[0].trim()) {
-    art[0] = hatLine;
+  // Hat: centered on species width with per-species offset
+  const hatStr = renderHatLine(bones.hat, bones.species, frame);
+  if (hatStr && !art[0].trim()) {
+    art[0] = hatStr;
   }
 
   // Build the card
@@ -213,10 +202,10 @@ export function renderCompanionCardMarkdown(
   const shiny = bones.shiny ? " \u2728" : "";
   const art = getArtFrame(bones.species, bones.eye, frame);
 
-  // Hat: replace first empty art line
-  const hatLine = HAT_ART[bones.hat];
-  if (hatLine && !art[0].trim()) {
-    art[0] = hatLine;
+  // Hat: centered on species width with per-species offset
+  const hatStr = renderHatLine(bones.hat, bones.species, frame);
+  if (hatStr && !art[0].trim()) {
+    art[0] = hatStr;
   }
 
   // Strip empty lines from art for cleaner rendering

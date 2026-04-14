@@ -36,7 +36,8 @@ import {
   type Companion, type StatName, type Species, type Rarity,
   type SearchCriteria, type SearchResult, type BuddyBones,
 } from "../server/engine.ts";
-import { getArtFrame, HAT_ART } from "../server/art.ts";
+import { getArtFrame } from "../server/art.ts";
+import { renderHatLine } from "../server/packs.ts";
 import {
   ACHIEVEMENTS, loadUnlocked, loadEvents,
   type Achievement, type UnlockedAchievement, type EventCounters,
@@ -1278,8 +1279,8 @@ function BuddyCardPane({ companion, slot, isActive, editablePersonality, editCur
   const stars = RARITY_STARS[b.rarity];
   const shiny = b.shiny ? " ✨" : "";
   const art = getArtFrame(b.species, b.eye, 0);
-  const hatLine = HAT_ART[b.hat];
-  if (hatLine && !art[0].trim()) art[0] = hatLine;
+  const hatStr = renderHatLine(b.hat, b.species, 0);
+  if (hatStr && !art[0].trim()) art[0] = hatStr;
   const reaction = loadReaction();
   const isEditing = typeof editablePersonality === "string";
   const displayPersonality = isEditing ? editablePersonality! : companion.personality;

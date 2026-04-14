@@ -14,12 +14,14 @@
 
 import { readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
-import { getActiveSpeciesData } from "../server/packs.ts";
+import { getActiveSpeciesData, BARE_HATS, getHatOffset } from "../server/packs.ts";
 
 const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 
 const BEGIN_MARKER = "# --- BEGIN GENERATED SPECIES ART ---";
 const END_MARKER = "# --- END GENERATED SPECIES ART ---";
+const HAT_BEGIN = "# --- BEGIN GENERATED HAT ART ---";
+const HAT_END = "# --- END GENERATED HAT ART ---";
 
 /** Escape a string for use in a bash double-quoted assignment. */
 function bashEscape(s: string): string {
@@ -39,8 +41,9 @@ function bashEscape(s: string): string {
 }
 
 interface ShellConfig {
-  speciesVar: string;  // e.g. "$SPECIES" or "$species"
-  frameVar: string;    // e.g. "$FRAME" or "$frame"
+  speciesVar: string;  // "$SPECIES"
+  frameVar: string;    // "$FRAME"
+  hatVar: string;      // "$HAT"
 }
 
 /** Generate case blocks for all active species. */
@@ -76,40 +79,107 @@ function generateCaseBlocks(cfg: ShellConfig): string {
   return lines.join("\n");
 }
 
-/** Patch a shell file between marker comments. */
-function patchFile(filePath: string, cfg: ShellConfig): void {
-  const content = readFileSync(filePath, "utf8");
-  const beginIdx = content.indexOf(BEGIN_MARKER);
-  const endIdx = content.indexOf(END_MARKER);
+/** Patch a region between marker comments in a file. */
+function patchRegion(content: string, beginMarker: string, endMarker: string, generated: string, filePath: string): string {
+  const beginIdx = content.indexOf(beginMarker);
+  const endIdx = content.indexOf(endMarker);
 
   if (beginIdx === -1 || endIdx === -1) {
-    console.error(`  \x1b[31m✗\x1b[0m  Markers not found in ${filePath}`);
-    console.error(`     Add these markers around the species case block:`);
-    console.error(`     ${BEGIN_MARKER}`);
-    console.error(`     ${END_MARKER}`);
-    process.exit(1);
+    // Markers not found — skip this region silently
+    return content;
   }
 
-  const before = content.slice(0, beginIdx + BEGIN_MARKER.length);
+  const before = content.slice(0, beginIdx + beginMarker.length);
   const after = content.slice(endIdx);
-  const generated = generateCaseBlocks(cfg);
+  return before + "\n" + generated + "\n" + after;
+}
 
-  const newContent = before + "\n" + generated + "\n" + after;
-  writeFileSync(filePath, newContent);
+/** Patch a shell file: species art + hat art. */
+function patchFile(filePath: string, cfg: ShellConfig): void {
+  let content = readFileSync(filePath, "utf8");
+
+  // Patch species art
+  const beginIdx = content.indexOf(BEGIN_MARKER);
+  const endIdx = content.indexOf(END_MARKER);
+  if (beginIdx === -1 || endIdx === -1) {
+    console.error(`  \x1b[31m✗\x1b[0m  Species art markers not found in ${filePath}`);
+    process.exit(1);
+  }
+  content = patchRegion(content, BEGIN_MARKER, END_MARKER, generateCaseBlocks(cfg), filePath);
+
+  // Patch hat art (optional — only if markers exist)
+  content = patchRegion(content, HAT_BEGIN, HAT_END, generateHatBlock(cfg), filePath);
+
+  writeFileSync(filePath, content);
   console.log(`  \x1b[32m✓\x1b[0m  ${filePath}`);
+}
+
+/** Generate hat case block: bare hat strings + per-species centering logic. */
+function generateHatBlock(cfg: ShellConfig): string {
+  const species = getActiveSpeciesData();
+  const lines: string[] = [];
+
+  // First: bare hat strings
+  lines.push(`BARE_HAT=""`);
+  lines.push(`case "${cfg.hatVar}" in`);
+  for (const [hat, bare] of Object.entries(BARE_HATS)) {
+    if (hat === "none" || !bare) continue;
+    lines.push(`  ${hat}) BARE_HAT="${bashEscape(bare)}" ;;`);
+  }
+  lines.push(`esac`);
+  lines.push(``);
+
+  // Second: per-species art width and hat offset per frame
+  lines.push(`HAT_LINE=""`);
+  lines.push(`if [ -n "$BARE_HAT" ]; then`);
+  lines.push(`  ART_W=12`);
+  lines.push(`  HAT_OFFSET=0`);
+  lines.push(`  case "${cfg.speciesVar}" in`);
+
+  for (const sp of species) {
+    // Compute max art width across all lines of all frames (excluding line 0)
+    // Compute max rendered width ({E} → single char)
+    let maxW = 0;
+    for (const frame of sp.art) {
+      for (let i = 1; i < frame.length; i++) {
+        maxW = Math.max(maxW, frame[i].replace(/\{E\}/g, ".").length);
+      }
+    }
+
+    const offsets = [0, 1, 2].map(f => getHatOffset(sp.id, f));
+    const hasOffset = offsets.some(o => o !== 0);
+
+    if (hasOffset) {
+      // Per-frame offsets
+      const frameCases = offsets.map((o, f) =>
+        `        ${f}) HAT_OFFSET=${o} ;;`
+      ).join("\n");
+      lines.push(`    ${sp.id}) ART_W=${maxW}`);
+      lines.push(`      case ${cfg.frameVar} in`);
+      lines.push(frameCases);
+      lines.push(`      esac ;;`);
+    } else {
+      lines.push(`    ${sp.id}) ART_W=${maxW} ;;`);
+    }
+  }
+
+  lines.push(`  esac`);
+  lines.push(`  BARE_LEN=\${#BARE_HAT}`);
+  lines.push(`  PAD=$(( (ART_W - BARE_LEN) / 2 + HAT_OFFSET ))`);
+  lines.push(`  [ "$PAD" -lt 0 ] && PAD=0`);
+  lines.push(`  HAT_LINE="$(printf '%*s%s' "$PAD" '' "$BARE_HAT")"`);
+  lines.push(`fi`);
+
+  return lines.join("\n");
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
+const SHELL_CFG: ShellConfig = { speciesVar: "$SPECIES", frameVar: "$FRAME", hatVar: "$HAT" };
+
 const targets: Array<{ path: string; cfg: ShellConfig }> = [
-  {
-    path: resolve(PROJECT_ROOT, "statusline/buddy-status.sh"),
-    cfg: { speciesVar: "$SPECIES", frameVar: "$FRAME" },
-  },
-  {
-    path: resolve(PROJECT_ROOT, "popup/buddy-render.sh"),
-    cfg: { speciesVar: "$species", frameVar: "$frame" },
-  },
+  { path: resolve(PROJECT_ROOT, "statusline/buddy-status.sh"), cfg: SHELL_CFG },
+  { path: resolve(PROJECT_ROOT, "popup/buddy-render.sh"), cfg: SHELL_CFG },
 ];
 
 console.log("Generating shell species art from pack data...\n");
