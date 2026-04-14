@@ -24,6 +24,10 @@
     "help": "bun run cli/index.ts help",
     "buddy-shell": "npx tsx cli/buddy-shell.ts",
     "tui": "bun run cli/tui.tsx",
+    "new-species": "bun run scripts/species-tool.ts new",
+    "import-species": "bun run scripts/species-tool.ts",
+    "delete-species": "bun run scripts/species-tool.ts delete",
+    "preview-species": "bun run scripts/species-tool.ts preview",
     "gen-shell-art": "bun run scripts/gen-shell-art.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
