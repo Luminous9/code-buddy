@@ -5,28 +5,14 @@
 
 export const SALT = "friend-2026-401";
 
-export const SPECIES = [
-  "duck",
-  "goose",
-  "blob",
-  "cat",
-  "dragon",
-  "octopus",
-  "owl",
-  "penguin",
-  "turtle",
-  "snail",
-  "ghost",
-  "axolotl",
-  "capybara",
-  "cactus",
-  "robot",
-  "rabbit",
-  "mushroom",
-  "chonk",
-] as const;
+import { getActiveSpecies, getCoreSpecies, buildFaceTemplates } from "./packs.ts";
 
-export type Species = (typeof SPECIES)[number];
+export const SPECIES: string[] = getActiveSpecies();
+
+/** Core species only — used by generateBones for deterministic ID-based generation. */
+const CORE_SPECIES: string[] = getCoreSpecies();
+
+export type Species = string;
 
 export const RARITIES = [
   "common",
@@ -268,11 +254,11 @@ function rollRarity(rng: () => number): Rarity {
   return "common";
 }
 
-export function generateBones(userId: string, salt: string = SALT): BuddyBones {
+export function generateBones(userId: string, salt: string = SALT, speciesPool?: string[]): BuddyBones {
   const rng = mulberry32(hashString(userId + salt));
 
   const rarity = rollRarity(rng);
-  const species = pick(rng, SPECIES);
+  const species = pick(rng, speciesPool ?? CORE_SPECIES);
   const eye = pick(rng, EYES);
   const hat = rarity === "common" ? "none" : pick(rng, HATS);
   const shiny = rng() < 0.01;
@@ -298,29 +284,11 @@ export function generateBones(userId: string, salt: string = SALT): BuddyBones {
 
 // ─── ASCII Art ──────────────────────────────────────────────────────────────
 
-const FACE_TEMPLATES: Record<Species, string> = {
-  duck: "({E}>",
-  goose: "({E}>",
-  blob: "({E}{E})",
-  cat: "={E}\u03c9{E}=",
-  dragon: "<{E}~{E}>",
-  octopus: "~({E}{E})~",
-  owl: "({E})({E})",
-  penguin: "({E}>)",
-  turtle: "[{E}_{E}]",
-  snail: "{E}(@)",
-  ghost: "/{E}{E}\\",
-  axolotl: "}{E}.{E}{",
-  capybara: "({E}oo{E})",
-  cactus: "|{E}  {E}|",
-  robot: "[{E}{E}]",
-  rabbit: "({E}..{E})",
-  mushroom: "|{E}  {E}|",
-  chonk: "({E}.{E})",
-};
+const FACE_TEMPLATES: Record<string, string> = buildFaceTemplates();
 
 export function renderFace(species: Species, eye: Eye): string {
-  return FACE_TEMPLATES[species].replace(/\{E\}/g, eye);
+  const template = FACE_TEMPLATES[species] ?? "({E}{E})";
+  return template.replace(/\{E\}/g, eye);
 }
 
 export function renderBuddy(bones: BuddyBones): string {

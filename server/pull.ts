@@ -6,8 +6,9 @@
  */
 
 import { randomBytes } from "crypto";
-import { generateBones, type BuddyBones, type Rarity, RARITIES } from "./engine.ts";
+import { generateBones, SPECIES, type BuddyBones, type Rarity, RARITIES } from "./engine.ts";
 import { type WalletState } from "./wallet.ts";
+import { getAvailablePullSpecies } from "./packs.ts";
 
 const RARITY_RANK: Record<Rarity, number> = {
   common: 0,
@@ -28,9 +29,10 @@ export interface PullResult {
 
 /**
  * Pull a random buddy. If pity thresholds are met, rejection-sample
- * until the minimum rarity is reached.
+ * until the minimum rarity is reached. If packId is provided, only
+ * accept species from that pack (rejection-sample).
  */
-export function pullBuddy(wallet: WalletState): PullResult {
+export function pullBuddy(wallet: WalletState, packId?: string): PullResult {
   let minRarity: Rarity | null = null;
   let pityTriggered = false;
 
@@ -42,15 +44,23 @@ export function pullBuddy(wallet: WalletState): PullResult {
     pityTriggered = true;
   }
 
-  const maxAttempts = minRarity === "legendary" ? 5_000_000
+  const allowedSpecies = new Set(getAvailablePullSpecies(packId));
+
+  // More attempts needed for smaller packs or pity
+  const baseAttempts = minRarity === "legendary" ? 5_000_000
     : minRarity === "epic" ? 2_000_000
     : 1;
+  const maxAttempts = packId ? Math.max(baseAttempts, 500_000) : baseAttempts;
 
   for (let i = 0; i < maxAttempts; i++) {
     const userId = randomBytes(16).toString("hex");
-    const bones = generateBones(userId);
+    const bones = generateBones(userId, undefined, SPECIES);
 
     if (minRarity && RARITY_RANK[bones.rarity] < RARITY_RANK[minRarity]) {
+      continue;
+    }
+
+    if (allowedSpecies.size > 0 && !allowedSpecies.has(bones.species)) {
       continue;
     }
 
@@ -59,7 +69,7 @@ export function pullBuddy(wallet: WalletState): PullResult {
 
   // Fallback — should never reach here with sufficient maxAttempts
   const userId = randomBytes(16).toString("hex");
-  return { bones: generateBones(userId), userId, pityTriggered: false };
+  return { bones: generateBones(userId, undefined, SPECIES), userId, pityTriggered: false };
 }
 
 /**

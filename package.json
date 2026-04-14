@@ -24,6 +24,7 @@
     "help": "bun run cli/index.ts help",
     "buddy-shell": "npx tsx cli/buddy-shell.ts",
     "tui": "bun run cli/tui.tsx",
+    "gen-shell-art": "bun run scripts/gen-shell-art.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

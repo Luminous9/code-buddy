@@ -3,8 +3,7 @@
  */
 
 import type { Species, Rarity, StatName } from "./engine.ts";
-
-type ReactionReason = "hatch" | "pet" | "error" | "test-fail" | "large-diff" | "turn" | "idle";
+import { buildSpeciesReactions, type ReactionReason } from "./packs.ts";
 
 interface ReactionPool {
   [key: string]: string[];
@@ -64,47 +63,8 @@ const REACTIONS: Record<ReactionReason, string[]> = {
   ],
 };
 
-// Species-specific flavor
-const SPECIES_REACTIONS: Partial<Record<Species, Partial<Record<ReactionReason, string[]>>>> = {
-  owl: {
-    error: [
-      "*head rotates 180\u00b0* ...I saw that.",
-      "*unblinking stare* check your types.",
-      "*hoots disapprovingly*",
-    ],
-    pet: ["*ruffles feathers contentedly*", "*dignified hoot*"],
-  },
-  cat: {
-    error: ["*knocks error off table*", "*licks paw, ignoring the stacktrace*"],
-    pet: ["*purrs* ...don't let it go to your head.", "*tolerates you*"],
-    idle: ["*pushes your coffee off the desk*", "*naps on keyboard*"],
-  },
-  duck: {
-    error: ["*quacks at the bug*", "have you tried rubber duck debugging? oh wait."],
-    pet: ["*happy quack*", "*waddles in circles*"],
-  },
-  dragon: {
-    error: ["*smoke curls from nostrils*", "*considers setting the codebase on fire*"],
-    "large-diff": ["*breathes fire on the old code* good riddance."],
-  },
-  ghost: {
-    error: ["*phases through the stack trace*", "I've seen worse... in the afterlife."],
-    idle: ["*floats through walls*", "*haunts your unused imports*"],
-  },
-  robot: {
-    error: ["SYNTAX. ERROR. DETECTED.", "*beeps aggressively*"],
-    "test-fail": ["FAILURE RATE: UNACCEPTABLE.", "*recalculating*"],
-  },
-  axolotl: {
-    error: ["*regenerates your hope*", "*smiles despite everything*"],
-    pet: ["*happy gill wiggle*", "*blushes pink*"],
-  },
-  capybara: {
-    error: ["*unbothered* it'll be fine.", "*continues vibing*"],
-    pet: ["*maximum chill achieved*", "*zen mode activated*"],
-    idle: ["*just sits there, radiating calm*"],
-  },
-};
+// Species-specific flavor (built from pack data)
+const SPECIES_REACTIONS: Record<string, Partial<Record<ReactionReason, string[]>>> = buildSpeciesReactions();
 
 // Rarity affects reaction quality/length
 const RARITY_BONUS: Partial<Record<Rarity, string[]>> = {

@@ -63,6 +63,7 @@ import {
   PULL_COST, MULTI_PULL_COUNT, MULTI_PULL_COST,
 } from "./wallet.ts";
 import { pullBuddy, updatePity, hatchFlavorText } from "./pull.ts";
+import { getAvailablePacks, getCurrentRotationPack, getPackSpeciesIds } from "./packs.ts";
 
 function getInstructions(): string {
   const companion = loadCompanion();
@@ -765,7 +766,7 @@ server.tool(
   "buddy_pick",
   "Generate a new random buddy and add it to the menagerie. Optionally filter by species and/or rarity. The new buddy becomes the active one.",
   {
-    species: z.enum(SPECIES).optional().describe(
+    species: z.string().optional().describe(
       "Desired species (e.g. 'turtle', 'cat', 'dragon'). If omitted, any species.",
     ),
     rarity: z.enum(RARITIES).optional().describe(
@@ -905,6 +906,40 @@ server.tool(
   },
 );
 
+// ─── Tool: buddy_packs ──────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_packs",
+  "Show available buddy packs for gacha pulls, including the current weekly featured pack",
+  {},
+  async () => {
+    ensureCompanion();
+    incrementEvent("commands_run", 1, activeSlot());
+
+    const available = getAvailablePacks();
+    const rotation = getCurrentRotationPack();
+
+    const parts: string[] = [];
+    parts.push("### \ud83c\udfb4 Available Packs\n");
+
+    for (const pack of available) {
+      const speciesNames = pack.species.map(s => s.id).join(", ");
+      const isFeatured = rotation && pack.id === rotation.id;
+      const label = isFeatured ? ` \u2728 *Featured this week*` : pack.id === "core" ? " *(always available)*" : "";
+      parts.push(`**${pack.icon} ${pack.name}** (\`${pack.id}\`)${label}`);
+      parts.push(`Species: ${speciesNames}\n`);
+    }
+
+    if (!isGachaMode()) {
+      parts.push("*Gacha mode is off. Enable with `/buddy gacha on` to pull from packs.*");
+    } else {
+      parts.push(`*Pull with: \`buddy_pull pack="core"\` or \`buddy_pull pack="${rotation?.id ?? "core"}"\`*`);
+    }
+
+    return { content: [{ type: "text", text: parts.join("\n") }] };
+  },
+);
+
 // ─── Tool: buddy_pull ───────────────────────────────────────────────────────
 
 server.tool(
@@ -920,8 +955,11 @@ server.tool(
     name: z.string().min(1).max(14).optional().describe(
       "Name for the pulled buddy. If omitted, a random name is assigned.",
     ),
+    pack: z.string().optional().describe(
+      "Pack to pull from (e.g. 'core', 'insects'). If omitted, pulls from all available packs.",
+    ),
   },
-  async ({ count, keep, name }) => {
+  async ({ count, keep, name, pack }) => {
     if (!isGachaMode()) {
       return {
         content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
@@ -930,6 +968,17 @@ server.tool(
     ensureCompanion();
     const slot = activeSlot();
     incrementEvent("commands_run", 1, slot);
+
+    // Validate pack if specified
+    if (pack) {
+      const available = getAvailablePacks();
+      const validIds = available.map(p => p.id);
+      if (!validIds.includes(pack)) {
+        return {
+          content: [{ type: "text", text: `Pack "${pack}" is not available. Available packs: ${validIds.join(", ")}` }],
+        };
+      }
+    }
 
     const pullCount = count ?? 1;
     const totalCost = pullCount === MULTI_PULL_COUNT ? MULTI_PULL_COST
@@ -951,7 +1000,7 @@ server.tool(
 
     for (let i = 0; i < pullCount; i++) {
       let w = loadWallet();
-      const { bones, userId, pityTriggered } = pullBuddy(w);
+      const { bones, userId, pityTriggered } = pullBuddy(w, pack);
 
       // Update pity counters and save
       w = loadWallet();

@@ -29,6 +29,7 @@ import {
 import { pullBuddy, updatePity } from "../server/pull.ts";
 import { incrementEvent, checkAndAward } from "../server/achievements.ts";
 import { saveReaction } from "../server/state.ts";
+import { getAvailablePacks, type Pack } from "../server/packs.ts";
 
 // ─── ANSI ─────────────────────────────────────────────────────────────────────
 
@@ -153,9 +154,12 @@ interface State {
   animFrame: number;
   animStart: number;
   message: string;
+  availablePacks: Pack[];
+  selectedPack: number; // index into availablePacks, 0 = first pack
 }
 
 function freshState(): State {
+  const packs = getAvailablePacks();
   return {
     phase: "confirm",
     wallet: loadWallet(),
@@ -166,6 +170,8 @@ function freshState(): State {
     animFrame: 0,
     animStart: 0,
     message: "",
+    availablePacks: packs,
+    selectedPack: 0,
   };
 }
 
@@ -242,6 +248,21 @@ function drawConfirm(s: State, cols: number): string {
   lines.push(center(`${D}Cost: ${PULL_COST} coins per pull${N}`, cols));
   lines.push(center(`${D}Pulls completed: ${w.pullCount}${N}`, cols));
   lines.push("");
+
+  // Pack selection
+  if (s.availablePacks.length > 1) {
+    const packLabels = s.availablePacks.map((p, i) => {
+      const selected = i === s.selectedPack;
+      return selected ? `${B}${CY}[${p.icon} ${p.name}]${N}` : `${D} ${p.icon} ${p.name} ${N}`;
+    }).join("  ");
+    lines.push(center(`Pack: ${packLabels}`, cols));
+    lines.push(center(`${D}\u2190\u2192 to switch pack${N}`, cols));
+    lines.push("");
+  } else if (s.availablePacks.length === 1) {
+    const p = s.availablePacks[0];
+    lines.push(center(`${D}Pack: ${p.icon} ${p.name}${N}`, cols));
+    lines.push("");
+  }
 
   if (w.pityEpic > 0 || w.pityLegendary > 0) {
     lines.push(center(`${D}Pity: epic ${w.pityEpic}/50  legendary ${w.pityLegendary}/100${N}`, cols));
@@ -456,8 +477,9 @@ function executePull(s: State): void {
   w.totalSpent += PULL_COST;
   saveWallet(w);
 
-  // Generate buddy
-  const { bones, userId, pityTriggered } = pullBuddy(w);
+  // Generate buddy from selected pack
+  const packId = s.availablePacks[s.selectedPack]?.id;
+  const { bones, userId, pityTriggered } = pullBuddy(w, packId);
 
   // Update pity
   const w2 = loadWallet();
@@ -534,6 +556,17 @@ function handleKey(key: string, s: State): boolean {
   switch (s.phase) {
     case "confirm": {
       if (key === "q" || key === "\x1b") return true;
+      // Left/right arrows to switch pack
+      if (key === "\x1b[D" || key === "h") {
+        s.selectedPack = (s.selectedPack - 1 + s.availablePacks.length) % s.availablePacks.length;
+        drawScreen(s);
+        return false;
+      }
+      if (key === "\x1b[C" || key === "l") {
+        s.selectedPack = (s.selectedPack + 1) % s.availablePacks.length;
+        drawScreen(s);
+        return false;
+      }
       if (key === "\r" || key === "\n") {
         if (canAfford(PULL_COST)) {
           s.message = "";

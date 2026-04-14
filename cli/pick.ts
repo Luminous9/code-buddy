@@ -80,7 +80,7 @@ function rpad(s: string, w: number): string {
 
 // ─── Option lists ─────────────────────────────────────────────────────────────
 
-const SP_OPTS = ["any", ...SPECIES]    as const;
+const SP_OPTS = ["any", ...SPECIES];
 const RA_OPTS = ["any", ...RARITIES]   as const;
 const SH_OPTS = ["any", "yes", "no"]   as const;
 const ST_OPTS = ["any", ...STAT_NAMES] as const;
