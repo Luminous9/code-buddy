@@ -6,7 +6,8 @@
  *   - statusline/buddy-status.sh
  *   - popup/buddy-render.sh
  *
- * Art lines 1-4 of each frame (line 0 is the hat slot, skipped).
+ * Art lines 0-4 of each frame. Line 0 is the hat slot — if non-blank,
+ * the species art overrides the hat for that frame.
  * {E} → ${E}, backticks escaped for bash.
  *
  * Usage: bun run gen-shell-art
@@ -59,13 +60,14 @@ function generateCaseBlocks(cfg: ShellConfig): string {
 
     for (let f = 0; f < sp.art.length; f++) {
       const frame = sp.art[f];
-      // Lines 1-4 (skip line 0 which is the hat slot)
+      // Line 0 is the hat slot — emitted so species can override it with art
+      const l0 = bashEscape(frame[0] ?? "");
       const l1 = bashEscape(frame[1] ?? "");
       const l2 = bashEscape(frame[2] ?? "");
       const l3 = bashEscape(frame[3] ?? "");
       const l4 = bashEscape(frame[4] ?? "");
 
-      lines.push(`      ${f}) L1="${l1}"; L2="${l2}"; L3="${l3}"; L4="${l4}" ;;`);
+      lines.push(`      ${f}) L0="${l0}"; L1="${l1}"; L2="${l2}"; L3="${l3}"; L4="${l4}" ;;`);
     }
 
     lines.push(`    esac ;;`);
@@ -73,7 +75,7 @@ function generateCaseBlocks(cfg: ShellConfig): string {
 
   // Fallback for unknown species
   lines.push(`  *)`);
-  lines.push(`    L1="(\${E}\${E})"; L2="(  )"; L3=""; L4="" ;;`);
+  lines.push(`    L0=""; L1="(\${E}\${E})"; L2="(  )"; L3=""; L4="" ;;`);
   lines.push(`esac`);
 
   return lines.join("\n");
@@ -179,7 +181,6 @@ const SHELL_CFG: ShellConfig = { speciesVar: "$SPECIES", frameVar: "$FRAME", hat
 
 const targets: Array<{ path: string; cfg: ShellConfig }> = [
   { path: resolve(PROJECT_ROOT, "statusline/buddy-status.sh"), cfg: SHELL_CFG },
-  { path: resolve(PROJECT_ROOT, "popup/buddy-render.sh"), cfg: SHELL_CFG },
 ];
 
 console.log("Generating shell species art from pack data...\n");

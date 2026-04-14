@@ -291,6 +291,11 @@ installHooks(settings);
 ensurePermissions(settings);
 saveSettings(settings);
 
+// Export reactions.json for the shell hook
+try {
+  execSync("bun run export-reactions", { cwd: PROJECT_ROOT, stdio: "ignore" });
+} catch { /* non-fatal */ }
+
 console.log("");
 const companion = initCompanion();
 

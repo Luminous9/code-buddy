@@ -3,20 +3,21 @@
  * scripts/species-tool.ts — helper for creating new species and packs
  *
  * Usage:
- *   bun run new-species                Generate a markdown template for a new species
+ *   bun run new-species [name]          Generate a markdown template in species-dev/
  *   bun run import-species <file>      Import a completed species template into a pack
  *   bun run delete-species <id>        Remove a species from its pack
- *   bun run preview-species <id>       Preview a species with animated frames
+ *   bun run preview-species <name>      Preview a species template from species-dev/
  */
 
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "fs";
 import { resolve, dirname, basename } from "path";
 import { execSync } from "child_process";
-import { getActiveSpeciesData, PACKS, renderHatLine, BARE_HATS } from "../server/packs.ts";
+import { renderHatLine } from "../server/packs.ts";
 
 const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 const PACKS_DIR = resolve(PROJECT_ROOT, "server/packs");
 const PACKS_INDEX = resolve(PROJECT_ROOT, "server/packs.ts");
+const SPECIES_DEV_DIR = resolve(PROJECT_ROOT, "species-dev");
 
 const GREEN = "\x1b[32m";
 const CYAN = "\x1b[36m";
@@ -104,10 +105,36 @@ Species-specific reaction strings. Leave blank to use generic reactions.
 
 ### idle
 -
+
+### success
+-
 `;
 
-function generateTemplate(): void {
-  const outPath = resolve(process.cwd(), "new-species-template.md");
+async function generateTemplate(name?: string): Promise<void> {
+  if (!name) {
+    process.stdout.write(`${CYAN}→${NC}  Species name: `);
+    name = (await new Promise<string>((resolve) => {
+      let buf = "";
+      process.stdin.setEncoding("utf8");
+      process.stdin.on("data", (chunk: string) => {
+        buf += chunk;
+        if (buf.includes("\n")) {
+          process.stdin.pause();
+          resolve(buf.trim());
+        }
+      });
+      process.stdin.resume();
+    }));
+  }
+
+  if (!name) {
+    err("Species name is required.");
+    process.exit(1);
+  }
+
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  mkdirSync(SPECIES_DEV_DIR, { recursive: true });
+  const outPath = resolve(SPECIES_DEV_DIR, `${slug}-design.md`);
   writeFileSync(outPath, TEMPLATE);
   ok(`Template written to ${outPath}`);
   info("Fill in the template, then run:");
@@ -200,7 +227,7 @@ function parseTemplate(filePath: string): ParsedSpecies {
 
   // Parse reactions
   const reactions: Record<string, string[]> = {};
-  const reactionTypes = ["error", "pet", "idle", "hatch", "test-fail", "large-diff", "turn"];
+  const reactionTypes = ["error", "pet", "idle", "hatch", "test-fail", "large-diff", "turn", "success"];
   let currentReaction = "";
 
   for (const line of lines) {
@@ -343,6 +370,14 @@ ${speciesBlock},
     warn("gen-shell-art failed — run manually: bun run gen-shell-art");
   }
 
+  // Export reactions.json for the shell hook
+  info("Exporting reactions...");
+  try {
+    execSync("bun run export-reactions", { cwd: PROJECT_ROOT, stdio: "inherit" });
+  } catch {
+    warn("export-reactions failed — run manually: bun run export-reactions");
+  }
+
   console.log(`\n${GREEN}${BOLD}Done!${NC} Species "${spec.id}" added to pack "${spec.pack}".`);
   if (spec.dev) {
     console.log(`${DIM}Pack is in dev mode — set dev: false in the pack file to release.${NC}`);
@@ -402,65 +437,90 @@ function deleteSpecies(speciesId: string): void {
     warn("gen-shell-art failed — run manually: bun run gen-shell-art");
   }
 
+  // Export reactions.json for the shell hook
+  info("Exporting reactions...");
+  try {
+    execSync("bun run export-reactions", { cwd: PROJECT_ROOT, stdio: "inherit" });
+  } catch {
+    warn("export-reactions failed — run manually: bun run export-reactions");
+  }
+
   console.log(`\n${GREEN}${BOLD}Done!${NC} Species "${speciesId}" removed.`);
 }
 
 // ─── Preview species ────────────────────────────────────────────────────────
 
-function previewSpecies(speciesId: string): void {
-  // Find species in pack data
-  const allSpecies = PACKS.flatMap(p => p.species);
-  const species = allSpecies.find(s => s.id === speciesId);
-
-  if (!species) {
-    // Also check dev packs
-    err(`Species "${speciesId}" not found. Available species:`);
-    for (const p of PACKS) {
-      const ids = p.species.map(s => s.id).join(", ");
-      console.log(`  ${p.icon} ${p.name} (${p.dev ? "dev" : "active"}): ${ids}`);
+function previewSpecies(fileArg: string): void {
+  // Resolve the template file — accept a path or a species name (looks in species-dev/)
+  let filePath = resolve(process.cwd(), fileArg);
+  if (!existsSync(filePath)) {
+    // Try as a species name in species-dev/
+    const slug = fileArg.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    filePath = resolve(SPECIES_DEV_DIR, `${slug}-design.md`);
+  }
+  if (!existsSync(filePath)) {
+    err(`Template not found: "${fileArg}"`);
+    // List available templates in species-dev/
+    if (existsSync(SPECIES_DEV_DIR)) {
+      const templates = readdirSync(SPECIES_DEV_DIR).filter(f => f.endsWith("-design.md"));
+      if (templates.length > 0) {
+        info("Available templates in species-dev/:");
+        for (const t of templates) {
+          console.log(`    ${t.replace(/-design\.md$/, "")}`);
+        }
+      }
     }
     process.exit(1);
   }
 
-  const pack = PACKS.find(p => p.species.some(s => s.id === speciesId))!;
+  info(`Parsing ${filePath}...`);
+  const species = parseTemplate(filePath);
   const eye = "·"; // default eye for preview
 
-  console.log(`\n  ${BOLD}${species.id}${NC} — ${pack.icon} ${pack.name} pack ${pack.dev ? `${DIM}(dev)${NC}` : ""}`);
+  console.log(`\n  ${BOLD}${species.id}${NC} — ${species.pack} pack`);
   console.log(`  Face: ${species.face.replace(/\{E\}/g, eye)}`);
-  if (species.hatOffset) {
+  if (species.hatOffset.some(o => o !== 0)) {
     console.log(`  Hat offset: [${species.hatOffset.join(", ")}]`);
   }
   console.log("");
 
   // Show all frames side by side (static view)
   const labels = species.art.map((_, i) => `Frame ${i}:`);
-  const colWidth = 18;
+  const maxLen = Math.max(...species.art.flat().map(l => l.replace(/\{E\}/g, eye).length));
+  const colWidth = Math.max(maxLen + 1, 18);
 
-  console.log("  " + labels.map(l => l.padEnd(colWidth)).join(""));
+  console.log("  " + labels.map(l => l.padEnd(colWidth)).join("  "));
   for (let line = 0; line < 5; line++) {
     const parts = species.art.map(frame => {
       const raw = frame[line] ?? "";
       return raw.replace(/\{E\}/g, eye);
     });
-    console.log("  " + parts.map(p => p.padEnd(colWidth)).join(""));
+    console.log("  " + parts.map(p => p.padEnd(colWidth)).join("  "));
   }
 
   // Show hat preview
   console.log("");
   console.log(`  ${DIM}Hat preview (crown):${NC}`);
   for (let f = 0; f < species.art.length; f++) {
-    const hatLine = renderHatLine("crown", species.id, f);
-    const artLine1 = species.art[f][1]?.replace(/\{E\}/g, eye) ?? "";
-    console.log(`  F${f}: ${hatLine}`);
-    console.log(`      ${artLine1}`);
+    const line0 = species.art[f][0]?.replace(/\{E\}/g, eye) ?? "";
+    if (line0.trim()) {
+      console.log(`  F${f}: ${line0}`);
+    } else {
+      const hatLine = renderHatLine("crown", species.id, f);
+      console.log(`  F${f}: ${hatLine || ""}`);
+    }
+    for (let i = 1; i <= 2; i++) {
+      const artLine = species.art[f][i]?.replace(/\{E\}/g, eye) ?? "";
+      console.log(`      ${artLine}`);
+    }
+    console.log("");
   }
 
   // Show reactions
-  if (species.reactions) {
-    console.log("");
+  if (Object.keys(species.reactions).length > 0) {
     console.log(`  ${DIM}Reactions:${NC}`);
     for (const [reason, lines] of Object.entries(species.reactions)) {
-      console.log(`    ${reason}: ${(lines as string[]).join(" / ")}`);
+      console.log(`    ${reason}: ${lines.join(" / ")}`);
     }
   }
 
@@ -476,30 +536,27 @@ function previewSpecies(speciesId: string): void {
   };
   process.on("SIGINT", cleanup);
 
-  const artHeight = 5; // lines per frame
-  let frameIdx = 0;
+  const drawHeight = 5; // 5 art lines (lines 0-4), no hat
+  const animSequence = [0, 1, 0, 2]; // frame 1 -> 2 -> 1 -> 3 (1-indexed)
+  let seqIdx = 0;
 
   // Print initial blank lines to reserve space
-  for (let i = 0; i < artHeight + 1; i++) console.log("");
+  for (let i = 0; i < drawHeight; i++) console.log("");
 
   const interval = setInterval(() => {
-    const frame = species.art[frameIdx % species.art.length];
+    const artIdx = animSequence[seqIdx % animSequence.length];
+    const frame = species.art[artIdx % species.art.length];
 
     // Move cursor up to overwrite
-    process.stdout.write(`\x1b[${artHeight + 1}A`);
+    process.stdout.write(`\x1b[${drawHeight}A`);
 
-    // Hat line
-    const hatLine = renderHatLine("crown", species.id, frameIdx);
-    const displayHat = hatLine || "            ";
-    process.stdout.write(`  ${CYAN}${displayHat}${NC}\x1b[K\n`);
-
-    // Art lines (skip line 0, show lines 1-4)
-    for (let i = 1; i < frame.length; i++) {
+    // All 5 art lines, no hat
+    for (let i = 0; i < frame.length; i++) {
       const rendered = frame[i].replace(/\{E\}/g, eye);
       process.stdout.write(`  ${CYAN}${rendered}${NC}\x1b[K\n`);
     }
 
-    frameIdx++;
+    seqIdx++;
   }, 500);
 
   // Run for 30 seconds then stop
@@ -517,7 +574,7 @@ const command = args[0];
 const arg = args[1];
 
 if (!command || command === "new" || command === "template") {
-  generateTemplate();
+  await generateTemplate(arg);
 } else if (command === "delete") {
   if (!arg) {
     err("Usage: bun run delete-species <species-id>");
@@ -526,7 +583,8 @@ if (!command || command === "new" || command === "template") {
   deleteSpecies(arg);
 } else if (command === "preview") {
   if (!arg) {
-    err("Usage: bun run preview-species <species-id>");
+    err("Usage: bun run preview-species <name-or-path>");
+    info("Pass a species name (looks in species-dev/) or a path to a template file.");
     process.exit(1);
   }
   previewSpecies(arg);

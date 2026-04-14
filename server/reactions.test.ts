@@ -34,6 +34,7 @@ describe("getReaction", () => {
     "large-diff",
     "turn",
     "idle",
+    "success",
   ] as const;
 
   test("returns a non-empty string for every (reason, species, rarity) combo", () => {

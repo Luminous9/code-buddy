@@ -24,6 +24,7 @@ export const corePack: Pack = {
       reactions: {
     error: ["*quacks at the bug*", "have you tried rubber duck debugging? oh wait."],
     pet: ["*happy quack*", "*waddles in circles*"],
+    success: ["*celebratory quacking*", "*waddles in circles*", "quack!", "*happy duck noises*"],
   },
     },
     {
@@ -34,6 +35,10 @@ export const corePack: Pack = {
         ["            ","    ({E}>     ","     ||     ","   _(__)_   ","    ^^^^    "],
         ["            ","     ({E}>>   ","     ||     ","   _(__)_   ","    ^^^^    "],
       ],
+      reactions: {
+    error: ["HONK OF FURY.", "*pecks the stack trace*", "*hisses at the bug*"],
+    success: ["*victorious honk*", "HONK OF APPROVAL.", "*struts triumphantly*"],
+  },
     },
     {
       id: "blob",
@@ -43,6 +48,10 @@ export const corePack: Pack = {
         ["            ","  .------.  "," (  {E}  {E}  ) "," (        ) ","  `------'  "],
         ["            ","    .--.    ","   ({E}  {E})   ","   (    )   ","    `--'    "],
       ],
+      reactions: {
+    error: ["*oozes with concern*", "*vibrates nervously*", "*turns slightly red*"],
+    success: ["*jiggles happily*", "*gleams*", "yay!", "*bounces*"],
+  },
     },
     {
       id: "cat",
@@ -56,6 +65,7 @@ export const corePack: Pack = {
     error: ["*knocks error off table*", "*licks paw, ignoring the stacktrace*"],
     pet: ["*purrs* ...don't let it go to your head.", "*tolerates you*"],
     idle: ["*pushes your coffee off the desk*", "*naps on keyboard*"],
+    success: ["*was never worried*", "*yawns*", "I knew you'd figure it out. eventually.", "*already asleep*"],
   },
     },
     {
@@ -69,6 +79,7 @@ export const corePack: Pack = {
       reactions: {
     error: ["*smoke curls from nostrils*", "*considers setting the codebase on fire*"],
     "large-diff": ["*breathes fire on the old code* good riddance."],
+    success: ["*nods, barely*", "...acceptable.", "*gold eyes gleam*", "as expected."],
   },
     },
     {
@@ -79,6 +90,10 @@ export const corePack: Pack = {
         ["            ","   .----.   ","  ( {E}  {E} )  ","  (______)  ","  \\/\\/\\/\\/  "],
         ["     o      ","   .----.   ","  ( {E}  {E} )  ","  (______)  ","  /\\/\\/\\/\\  "],
       ],
+      reactions: {
+    error: ["*ink cloud of dismay*", "*all eight arms throw up*", "*turns deep red*"],
+    success: ["*turns gentle blue*", "*arms applaud in sync*", "excellent, from all angles."],
+  },
     },
     {
       id: "owl",
@@ -95,6 +110,7 @@ export const corePack: Pack = {
       "*hoots disapprovingly*",
     ],
     pet: ["*ruffles feathers contentedly*", "*dignified hoot*"],
+    success: ["*satisfied hoot*", "knowledge confirmed.", "*nods sagely*"],
   },
     },
     {
@@ -105,6 +121,10 @@ export const corePack: Pack = {
         ["            ","  .---.     ","  ({E}>{E})     "," |(   )|    ","  `---'     "],
         ["  .---.     ","  ({E}>{E})     "," /(   )\\    ","  `---'     ","   ~ ~      "],
       ],
+      reactions: {
+    error: ["*adjusts glasses disapprovingly*", "this will not do.", "frightfully unfortunate."],
+    success: ["*polite applause*", "quite good, quite good.", "splendid work, really."],
+  },
     },
     {
       id: "turtle",
@@ -114,6 +134,10 @@ export const corePack: Pack = {
         ["            ","   _,--._   ","  ( {E}  {E} )  "," /[______]\\ ","   ``  ``   "],
         ["            ","   _,--._   ","  ( {E}  {E} )  "," /[======]\\ ","  ``    ``  "],
       ],
+      reactions: {
+    error: ["*slow blink* bugs are fleeting.", "*retreats slightly into shell*"],
+    success: ["*satisfied shell settle*", "as the ancients foretold.", "*slow approving nod*"],
+  },
     },
     {
       id: "snail",
@@ -123,6 +147,10 @@ export const corePack: Pack = {
         ["            ","  {E}   .--.  ","  |  ( @ )  ","   \\_`--'   ","  ~~~~~~~   "],
         ["            "," {E}    .--.  ","  \\  ( @  ) ","   \\_`--'   ","   ~~~~~~   "],
       ],
+      reactions: {
+    error: ["*slow sigh*", "such is the nature of bugs.", "*leaves slime trail of disappointment*"],
+    success: ["*slow satisfied nod*", "good things take time.", "*leaves victory slime*"],
+  },
     },
     {
       id: "ghost",
@@ -135,6 +163,7 @@ export const corePack: Pack = {
       reactions: {
     error: ["*phases through the stack trace*", "I've seen worse... in the afterlife."],
     idle: ["*floats through walls*", "*haunts your unused imports*"],
+    success: ["*glows approvingly*", "*floats a victory lap*"],
   },
     },
     {
@@ -148,6 +177,7 @@ export const corePack: Pack = {
       reactions: {
     error: ["*regenerates your hope*", "*smiles despite everything*"],
     pet: ["*happy gill wiggle*", "*blushes pink*"],
+    success: ["*happy gill flutter*", "*beams*", "you did it!", "*blushes pink*"],
   },
     },
     {
@@ -162,6 +192,7 @@ export const corePack: Pack = {
     error: ["*unbothered* it'll be fine.", "*continues vibing*"],
     pet: ["*maximum chill achieved*", "*zen mode activated*"],
     idle: ["*just sits there, radiating calm*"],
+    success: ["*maximum chill maintained*", "*nods once*", "good vibes.", "see? no panic needed."],
   },
     },
     {
@@ -172,6 +203,10 @@ export const corePack: Pack = {
         ["            ","    ____    "," n |{E}  {E}| n "," |_|    |_| ","   |    |   "],
         [" n        n "," |  ____  | "," | |{E}  {E}| | "," |_|    |_| ","   |    |   "],
       ],
+      reactions: {
+    error: ["*spines bristle*", "hydrate and try again."],
+    success: ["*blooms briefly*", "survival confirmed.", "*quiet bloom*"],
+  },
     },
     {
       id: "robot",
@@ -184,6 +219,7 @@ export const corePack: Pack = {
       reactions: {
     error: ["SYNTAX. ERROR. DETECTED.", "*beeps aggressively*"],
     "test-fail": ["FAILURE RATE: UNACCEPTABLE.", "*recalculating*"],
+    success: ["OBJECTIVE: COMPLETE.", "*satisfying beep*", "NOMINAL."],
   },
     },
     {
@@ -194,6 +230,10 @@ export const corePack: Pack = {
         ["            ","   (|__/)   ","  ( {E}  {E} )  "," =(  ..  )= ","  (\")__(\")"],
         ["            ","   (\\__/)   ","  ( {E}  {E} )  "," =( .  . )= ","  (\")__(\")"],
       ],
+      reactions: {
+    error: ["*nervous twitching*", "*hops backwards*", "*freezes in panic*"],
+    success: ["*excited binky*", "*zoomies of joy*", "yay yay yay!"],
+  },
     },
     {
       id: "mushroom",
@@ -203,6 +243,10 @@ export const corePack: Pack = {
         ["            "," .-O-oo-O-. ","(__________)","   |{E}  {E}|   ","   |____|   "],
         ["   . o  .   "," .-o-OO-o-. ","(__________)","   |{E}  {E}|   ","   |____|   "],
       ],
+      reactions: {
+    error: ["*releases worried spores*", "the mycelium disagrees.", "*cap droops*"],
+    success: ["*spores of celebration*", "the mycelium approves.", "*cap brightens*"],
+  },
     },
     {
       id: "chonk",
@@ -212,6 +256,10 @@ export const corePack: Pack = {
         ["            ","  /\\    /|  "," ( {E}    {E} ) "," (   ..   ) ","  `------'  "],
         ["            ","  /\\    /\\  "," ( {E}    {E} ) "," (   ..   ) ","  `------'~ "],
       ],
+      reactions: {
+    error: ["*doesn't move*", "too tired for this.", "*rolls away from the error*"],
+    success: ["*happy purr*", "*satisfied chonk noises*", "acceptable."],
+  },
     },
   ],
 };

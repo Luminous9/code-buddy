@@ -28,5 +28,20 @@ export const insectsPack: Pack = {
         idle: ["*cleans front legs*", "*watches with all four eyes*"],
       },
     },
+      {
+      id: "beetle",
+      face: "\\ {E}  |",
+      art: [
+        ["", " }{  _", "  \\\\_) \\_ ______", "   \\ {E}   |    _ _\\", "    `¯_/`¬¯\\\\¸¬¯\\\\¸ "],
+        [" }{  _", "  \\\\_) \\_ ,–––.===;", "   \\ {E}   |( __)--'", "    `¯ /`¬\\\\ ¬\\\\ ", "      '     `   `"],
+        ["", "}{  _", " \\\\_) \\_ ______", "  \\ {E}   |    _ _\\", "   `¯<_`¬\\\\_¸¬\\\\_¸"],
+      ],
+      hatOffset: [-4, -4, -5],
+      reactions: {
+        "error": ["*stretches out wings in annoyance*", "*attacks the error message with horn*"],
+        "pet": ["*happily flutters wings*", "Mmm... now scratch my horn as well"],
+        "idle": ["*swings horn out of boredom*"],
+      },
+    },
   ],
 };

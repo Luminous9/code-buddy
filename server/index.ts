@@ -288,15 +288,52 @@ server.tool(
 
 server.tool(
   "buddy_rename",
-  "Rename your coding companion",
+  "Rename a buddy. Targets the active buddy by default, or a specific buddy by slot name.",
   {
     name: z
       .string()
       .min(1)
       .max(14)
       .describe("New name for your buddy (1-14 characters)"),
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to rename. If omitted, renames the active buddy."),
   },
-  async ({ name }) => {
+  async ({ name, slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      const newSlot = slugify(name);
+      if (newSlot !== slot && loadCompanionSlot(newSlot)) {
+        return {
+          content: [{ type: "text", text: `A buddy in slot "${newSlot}" already exists. Pick a different name.` }],
+        };
+      }
+      const oldName = target.name;
+      target.name = name;
+      if (newSlot !== slot) {
+        deleteCompanionSlot(slot);
+        saveCompanionSlot(newSlot, target);
+        // Update active slot if it pointed to the old slot
+        if (loadActiveSlot() === slot) {
+          saveActiveSlot(newSlot);
+        }
+      } else {
+        updateCompanionSlot(slot, target);
+      }
+      incrementEvent("commands_run", 1, newSlot);
+      return {
+        content: [{ type: "text", text: `Renamed: ${oldName} [${slot}] \u2192 ${name} [${newSlot}]` }],
+      };
+    }
+
     const companion = ensureCompanion();
     const oldName = companion.name;
     companion.name = name;

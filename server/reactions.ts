@@ -63,6 +63,12 @@ const REACTIONS: Record<ReactionReason, string[]> = {
     "*stares at cursor blinking*",
     "zzz...",
   ],
+  success: [
+    "*nods*",
+    "nice.",
+    "*quiet approval*",
+    "clean.",
+  ],
 };
 
 // Species-specific flavor (built from pack data)
@@ -89,8 +95,8 @@ export function getReaction(
   const speciesPool = SPECIES_REACTIONS[species]?.[reason];
   const generalPool = REACTIONS[reason];
 
-  // 40% chance of species-specific if available
-  const pool = speciesPool && Math.random() < 0.4 ? speciesPool : generalPool;
+  // 50% chance of species-specific if available
+  const pool = speciesPool && Math.random() < 0.5 ? speciesPool : generalPool;
   let reaction = pool[Math.floor(Math.random() * pool.length)];
 
   // Template substitution
@@ -190,6 +196,6 @@ export function buildPersonalityBlock(
     "</personality-prompt>",
     "",
     `Call \`buddy_set_personality\` with the personality text (2-3 sentences) and slot="${slot}".`,
-    `If the generated name fits better than "${currentName}", also call \`buddy_rename\`.`,
+    `Then call \`buddy_rename\` with the generated name and slot="${slot}" (the current placeholder name is "${currentName}").`,
   ].join("\n");
 }

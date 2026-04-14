@@ -23,7 +23,7 @@ function mulberry32(seed: number): () => number {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type ReactionReason = "hatch" | "pet" | "error" | "test-fail" | "large-diff" | "turn" | "idle";
+export type ReactionReason = "hatch" | "pet" | "error" | "test-fail" | "large-diff" | "turn" | "idle" | "success";
 
 export interface PackSpecies {
   id: string;
