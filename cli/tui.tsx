@@ -1394,7 +1394,7 @@ const SETTING_DEFS: SettingDef[] = [
   { key: "bubblePosition", label: "Bubble Position", description: ["Bubble placement.", "", "top → above buddy", "left → beside buddy"], type: "options", options: ["top", "left"], default: "top" },
   { key: "showRarity", label: "Show Rarity", description: ["Show rarity stars in", "the status line.", "", "true → ★★★★ visible", "false → hidden"], type: "options", options: ["true", "false"], default: "true" },
   { key: "statusLineEnabled", label: "Status Line", description: ["Animated buddy in Claude Code's", "status line bar.", "", "true  → patches settings.json", "false → removes it", "", "Restart Claude Code after toggle."], type: "options", options: ["true", "false"], default: "false" },
-  { key: "gachaMode", label: "Gacha Mode", description: ["Toggle the coin economy.", "", "true  → earn coins, do pulls", "         hunt/pick search disabled", "false → free hunt/pick acquisition", "         coin economy disabled"], type: "options", options: ["true", "false"], default: "false" },
+  { key: "gachaMode", label: "Gacha Mode", description: ["Toggle the coin economy.", "", "Enabled by default.", "", "true  → earn coins, do pulls", "         hunt/pick search disabled", "false → free hunt/pick acquisition", "         coin economy disabled"], type: "options", options: ["true", "false"], default: "true" },
 ];
 
 function SettingDetailPane({ settingIndex, config, editing, numInput, optCursor }: {

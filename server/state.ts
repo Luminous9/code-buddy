@@ -347,7 +347,7 @@ const DEFAULT_CONFIG: BuddyConfig = {
   bubblePosition: "top",
   showRarity: true,
   statusLineEnabled: false,
-  gachaMode: false,
+  gachaMode: true,
 };
 
 export function isGachaMode(): boolean {

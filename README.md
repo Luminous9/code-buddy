@@ -29,7 +29,7 @@ This repo is still Claude Code-first today. It installs the same core MCP server
 The difference is that this fork treats the buddy system more like an evolving companion game:
 
 - Your original account buddy is still deterministic and stable.
-- You can now collect additional buddies through a coin-based gacha system. (Note: you can turn this off and use the hunt/search tools to get whatever buddy you want still)
+- You can now collect additional buddies through a coin-based gacha system. If you prefer the old free hunt/search flow, you can turn gacha mode off.
 - Species are organized into packs, so new themed groups can be added without rewriting the whole engine.
 - Pulled buddies can get LLM-generated names and personalities instead of relying only on static templates.
 - The project now has an initial `hostType` setting so future Claude Code and Codex support can share the same core state/config.
@@ -60,10 +60,10 @@ bun run install-buddy
 
 Then restart Claude Code and type `/buddy`.
 
-Optional next steps:
+Optional next step if you want the classic non-gacha flow:
 
 ```bash
-bun run settings gacha on
+bun run settings gacha off
 ```
 
 Notes:
@@ -89,11 +89,10 @@ Each profile gets its own MCP entry, skill, hooks, status line config, and `budd
 
 <br>
 
-This fork adds an optional gacha mode for collecting buddies beyond your original deterministic account buddy.
+This fork enables gacha mode so you can start collecting buddies beyond your original deterministic account buddy through a fun gradual process.
 
 ### How it works
 
-- Turn gacha mode on with `bun run settings gacha on` or `/buddy gacha on`.
 - Earn coins through normal use: turns, errors, test failures, large diffs, sessions, active days, and pets.
 - Spend `50` coins per pull to hatch a random buddy.
 - While gacha mode is on, free hunt/pick acquisition is disabled and pulls become the main way to obtain new buddies.
