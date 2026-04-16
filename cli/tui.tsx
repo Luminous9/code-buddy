@@ -265,6 +265,7 @@ function BuddyListPane({ slots, cursor, activeSlot, focused, searchTerm }: {
 // ─── Middle: Settings List ──────────────────────────────────────────────────
 
 const SETTINGS_ITEMS = [
+  { key: "hostType", label: "Host Type" },
   { key: "commentCooldown", label: "Comment Cooldown" },
   { key: "reactionTTL", label: "Reaction TTL" },
   { key: "bubbleStyle", label: "Bubble Style" },
@@ -1376,6 +1377,7 @@ interface SettingDef {
 }
 
 const SETTING_DEFS: SettingDef[] = [
+  { key: "hostType", label: "Host Type", description: ["Default host for buddy integrations.", "", "claude → use Claude-oriented defaults", "codex  → use Codex-oriented defaults", "", "Currently used by soul generation."], type: "options", options: ["claude", "codex"], default: "claude" },
   { key: "commentCooldown", label: "Comment Cooldown", description: ["Minimum seconds between", "buddy status line comments.", "", "Lower = chatty, Higher = quiet"], type: "number", min: 0, default: "30" },
   { key: "reactionTTL", label: "Reaction TTL", description: ["How long reactions stay", "visible in status line.", "", "0 = permanent"], type: "number", min: 0, default: "0" },
   { key: "bubbleStyle", label: "Bubble Style", description: ["Speech bubble style.", "", 'classic → "quoted"', "round → (parens)"], type: "options", options: ["classic", "round"], default: "classic" },

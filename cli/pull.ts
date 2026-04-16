@@ -12,7 +12,7 @@
 import {
   loadActiveSlot, saveCompanionSlot,
   slugify, unusedName, writeStatusState, loadCompanionSlot,
-  isGachaMode,
+  isGachaMode, loadHostType,
 } from "../server/state.ts";
 import {
   generateBones, RARITIES, RARITY_STARS,
@@ -31,6 +31,9 @@ import { saveReaction } from "../server/state.ts";
 import { getAvailablePacks, type Pack } from "../server/packs.ts";
 import { generatePersonalityPrompt, inspirationSeed } from "../server/reactions.ts";
 import { execFile } from "child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 // ─── ANSI ─────────────────────────────────────────────────────────────────────
 
@@ -144,6 +147,7 @@ const EGG_OPEN = [
 // ─── State ────────────────────────────────────────────────────────────────────
 
 type Phase = "confirm" | "egg" | "wobble" | "crack" | "reveal" | "card" | "decide";
+type SoulProvider = "claude" | "codex";
 
 interface SoulResult {
   name: string;
@@ -165,9 +169,10 @@ interface State {
   resolvedSoul: SoulResult | null;
   soulDone: boolean;
   fallbackName: string; // pre-generated fallback if soul-gen fails
+  soulProvider: SoulProvider;
 }
 
-function freshState(): State {
+function freshState(soulProvider: SoulProvider): State {
   const packs = getAvailablePacks();
   return {
     phase: "confirm",
@@ -184,6 +189,7 @@ function freshState(): State {
     resolvedSoul: null,
     soulDone: false,
     fallbackName: "",
+    soulProvider,
   };
 }
 
@@ -197,7 +203,7 @@ function rarityIndex(r: Rarity): number {
 
 // Duration of wobble phase scales with rarity
 function wobbleDurationMs(rarity: Rarity): number {
-  return 1000 + rarityIndex(rarity) * 500; // 1s common → 3s legendary
+  return 2000 + rarityIndex(rarity) * 500; // 1s common → 3s legendary
 }
 
 function crackDurationMs(): number { return 800; }
@@ -256,6 +262,7 @@ function drawConfirm(s: State, cols: number): string {
   lines.push("");
   lines.push(center(`${D}Cost: ${PULL_COST} coins per pull${N}`, cols));
   lines.push(center(`${D}Pulls completed: ${w.pullCount}${N}`, cols));
+  lines.push(center(`${D}Soul LLM: ${s.soulProvider}${N}`, cols));
   lines.push("");
 
   // Pack selection
@@ -470,15 +477,69 @@ function stopAnimation(): void {
   }
 }
 
-// ─── Soul generation via claude CLI ──────────────────────────────────────────
+// ─── Soul generation via Claude or Codex CLI ─────────────────────────────────
 
-function generateSoul(bones: BuddyBones, userId: string): Promise<SoulResult | null> {
+function normalizeSoul(raw: unknown): SoulResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const soul = raw as Partial<SoulResult>;
+  const name = typeof soul.name === "string" ? soul.name.trim() : "";
+  const personality = typeof soul.personality === "string" ? soul.personality.trim() : "";
+  if (!name || !personality) return null;
+  if (name.length > 14 || personality.length > 500) return null;
+  return { name, personality };
+}
+
+function parseSoulText(text: string): SoulResult | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const jsonStr = fenceMatch ? fenceMatch[1].trim() : trimmed;
+  try {
+    return normalizeSoul(JSON.parse(jsonStr));
+  } catch {
+    return null;
+  }
+}
+
+function parseSoulFromMixedOutput(text: string): SoulResult | null {
+  const direct = parseSoulText(text);
+  if (direct) return direct;
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line.startsWith("{") || !line.endsWith("}")) continue;
+    try {
+      const parsed = normalizeSoul(JSON.parse(line));
+      if (parsed) return parsed;
+    } catch {
+      // keep scanning upward for the first valid JSON object
+    }
+  }
+
+  return null;
+}
+
+function soulPrompt(bones: BuddyBones, userId: string): string {
   const seed = inspirationSeed(userId);
-  const prompt = generatePersonalityPrompt(
+  return generatePersonalityPrompt(
     bones.species, bones.rarity, bones.stats, bones.shiny, seed,
   );
+}
 
+function generateSoulWithClaude(prompt: string): Promise<SoulResult | null> {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (soul: SoulResult | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(soul);
+    };
+
     const child = execFile(
       "claude",
       [
@@ -490,31 +551,102 @@ function generateSoul(bones: BuddyBones, userId: string): Promise<SoulResult | n
       ],
       { timeout: 30_000, encoding: "utf-8" },
       (err, stdout) => {
-        if (err) { resolve(null); return; }
+        if (err) { finish(null); return; }
         try {
-          // --output-format json returns { result: "..." } with the model's text
           const outer = JSON.parse(stdout.trim());
           const text: string = typeof outer === "string" ? outer : outer.result ?? "";
-          // The model may wrap JSON in ```json ... ``` fences — strip them
-          const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-          const jsonStr = fenceMatch ? fenceMatch[1].trim() : text.trim();
-          // Parse the JSON object with name + personality
-          const soul = JSON.parse(jsonStr) as SoulResult;
-          if (soul.name && soul.personality
-            && soul.name.length <= 14
-            && soul.personality.length <= 500) {
-            resolve(soul);
-            return;
-          }
-          resolve(null);
+          finish(parseSoulText(text));
         } catch {
-          resolve(null);
+          finish(null);
         }
       },
     );
-    // If claude isn't installed or PATH is wrong, catch spawn errors
-    child.on("error", () => resolve(null));
+
+    child.stdin?.end();
+    child.on("error", () => finish(null));
   });
+}
+
+function generateSoulWithCodex(prompt: string): Promise<SoulResult | null> {
+  const tmpRoot = mkdtempSync(join(tmpdir(), "buddy-soul-"));
+  const outPath = join(tmpRoot, "last-message.txt");
+  const schemaPath = join(tmpRoot, "soul.schema.json");
+  writeFileSync(schemaPath, JSON.stringify({
+    type: "object",
+    additionalProperties: false,
+    required: ["name", "personality"],
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 14 },
+      personality: { type: "string", minLength: 1, maxLength: 500 },
+    },
+  }, null, 2));
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const cleanup = () => rmSync(tmpRoot, { recursive: true, force: true });
+    const finish = (soul: SoulResult | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(soul);
+    };
+
+    const child = execFile(
+      "codex",
+      [
+        "exec",
+        "--ephemeral",
+        "--sandbox", "read-only",
+        "--color", "never",
+        "--model", "gpt-5.4-mini",
+        "--config", 'model_reasoning_effort="low"',
+        "--output-schema", schemaPath,
+        "--output-last-message", outPath,
+        prompt,
+      ],
+      { timeout: 30_000, encoding: "utf-8" },
+      (err, stdout) => {
+        const fromStdout = parseSoulFromMixedOutput(stdout);
+        if (err && !fromStdout) { finish(null); return; }
+        try {
+          const fromFile = parseSoulText(readFileSync(outPath, "utf8"));
+          finish(fromFile ?? fromStdout);
+        } catch {
+          finish(fromStdout);
+        }
+      },
+    );
+
+    child.stdin?.end();
+    child.on("error", () => finish(null));
+  });
+}
+
+function generateSoul(
+  provider: SoulProvider,
+  bones: BuddyBones,
+  userId: string,
+): Promise<SoulResult | null> {
+  const prompt = soulPrompt(bones, userId);
+  return provider === "codex"
+    ? generateSoulWithCodex(prompt)
+    : generateSoulWithClaude(prompt);
+}
+
+function resolveSoulProvider(argv: string[], envValue: string | undefined): SoulProvider {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--llm" || arg === "--soul-llm") {
+      const value = argv[i + 1]?.toLowerCase();
+      if (value === "claude" || value === "codex") return value;
+    }
+    const match = arg.match(/^--(?:llm|soul-llm)=(claude|codex)$/i);
+    if (match) return match[1].toLowerCase() as SoulProvider;
+  }
+
+  const fromEnv = envValue?.toLowerCase();
+  if (fromEnv === "claude" || fromEnv === "codex") return fromEnv;
+  return loadHostType();
 }
 
 // ─── Pull execution ──────────────────────────────────────────────────────────
@@ -551,7 +683,7 @@ function executePull(s: State): void {
   // Fire off soul generation in parallel with the animation
   s.resolvedSoul = null;
   s.soulDone = false;
-  s.pendingSoul = generateSoul(bones, userId).then((soul) => {
+  s.pendingSoul = generateSoul(s.soulProvider, bones, userId).then((soul) => {
     s.resolvedSoul = soul;
     s.soulDone = true;
     return soul;
@@ -683,7 +815,11 @@ async function main(): Promise<void> {
     console.log("    /buddy gacha on\n");
     process.exit(0);
   }
-  const s = freshState();
+  const soulProvider = resolveSoulProvider(
+    process.argv.slice(2),
+    process.env.BUDDY_SOUL_PROVIDER,
+  );
+  const s = freshState(soulProvider);
 
   // Setup terminal
   process.stdout.write("\x1b[?25l"); // hide cursor

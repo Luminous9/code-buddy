@@ -18,14 +18,34 @@ if (!key) {
   console.log(`
   claude-buddy settings
   ─────────────────────
+  Host type:         ${cfg.hostType}    (default host for buddy integrations and soul generation)
   Comment cooldown:  ${cfg.commentCooldown}s    (0 = no throttling, default 30)
   Reaction TTL:      ${cfg.reactionTTL}s    (0 = permanent, default 0)
   Gacha mode:        ${cfg.gachaMode ? "on" : "off"}    (on = coin economy + pulls, off = free hunt/pick)
 
   Change:  bun run settings cooldown <seconds>
            bun run settings ttl <seconds>
+           bun run settings host claude|codex
            bun run settings gacha on|off
 `);
+  process.exit(0);
+}
+
+if (key === "host") {
+  if (value === undefined) {
+    const cfg = loadConfig();
+    console.log(`Host type: ${cfg.hostType}`);
+    process.exit(0);
+  }
+
+  if (value !== "claude" && value !== "codex") {
+    console.error("Error: host must be 'claude' or 'codex'");
+    process.exit(1);
+  }
+
+  const cfg = saveConfig({ hostType: value });
+  console.log(`Updated: host type → ${cfg.hostType}`);
+  console.log(`  Default soul generation now follows the ${cfg.hostType} host unless you override it with --llm.`);
   process.exit(0);
 }
 
@@ -90,5 +110,5 @@ if (key === "gacha") {
 }
 
 console.error(`Unknown setting: ${key}`);
-console.error("Available: cooldown, ttl, gacha");
+console.error("Available: host, cooldown, ttl, gacha");
 process.exit(1);

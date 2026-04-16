@@ -326,6 +326,7 @@ export function resolveUserId(): string {
 // ─── Config persistence ─────────────────────────────────────────────────────
 
 export interface BuddyConfig {
+  hostType: BuddyHostType;
   commentCooldown: number;
   reactionTTL: number;
   bubbleStyle: "classic" | "round";
@@ -335,7 +336,10 @@ export interface BuddyConfig {
   gachaMode: boolean;
 }
 
+export type BuddyHostType = "claude" | "codex";
+
 const DEFAULT_CONFIG: BuddyConfig = {
+  hostType: "claude",
   commentCooldown: 30,
   reactionTTL: 0,
   bubbleStyle: "classic",
@@ -347,6 +351,15 @@ const DEFAULT_CONFIG: BuddyConfig = {
 
 export function isGachaMode(): boolean {
   return loadConfig().gachaMode;
+}
+
+export function hostTypeFromValue(value: string | undefined): BuddyHostType | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "claude" || normalized === "codex" ? normalized : null;
+}
+
+export function loadHostType(): BuddyHostType {
+  return hostTypeFromValue(process.env.BUDDY_HOST) ?? loadConfig().hostType;
 }
 
 export function loadConfig(): BuddyConfig {
