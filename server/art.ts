@@ -6,115 +6,14 @@
  * {E} is replaced with the eye character at render time.
  */
 
-import type { Species, Eye, Hat, Rarity, StatName, BuddyBones } from "./engine.ts";
+import type { Species, Eye, Rarity, StatName, BuddyBones } from "./engine.ts";
+import { buildSpeciesArt, renderHatLine } from "./packs.ts";
 
-// ─── Species art: 3 frames × 5 lines each ──────────────────────────────────
+// ─── Species art: 3 frames × 5 lines each (built from packs) ───────────────
 
-export const SPECIES_ART: Record<Species, string[][]> = {
-  duck: [
-    ["            ", "    __      ", "  <({E} )___  ", "   (  ._>   ", "    `--'    "],
-    ["            ", "    __      ", "  <({E} )___  ", "   (  ._>   ", "    `--'~   "],
-    ["            ", "    __      ", "  <({E} )___  ", "   (  .__>  ", "    `--'    "],
-  ],
-  goose: [
-    ["            ", "     ({E}>    ", "     ||     ", "   _(__)_   ", "    ^^^^    "],
-    ["            ", "    ({E}>     ", "     ||     ", "   _(__)_   ", "    ^^^^    "],
-    ["            ", "     ({E}>>   ", "     ||     ", "   _(__)_   ", "    ^^^^    "],
-  ],
-  blob: [
-    ["            ", "   .----.   ", "  ( {E}  {E} )  ", "  (      )  ", "   `----'   "],
-    ["            ", "  .------.  ", " (  {E}  {E}  ) ", " (        ) ", "  `------'  "],
-    ["            ", "    .--.    ", "   ({E}  {E})   ", "   (    )   ", "    `--'    "],
-  ],
-  cat: [
-    ["            ", "   /\\_/\\    ", "  ( {E}   {E})  ", "  (  \u03c9  )   ", "  (\")_(\")   "],
-    ["            ", "   /\\_/\\    ", "  ( {E}   {E})  ", "  (  \u03c9  )   ", "  (\")_(\")~  "],
-    ["            ", "   /\\-/\\    ", "  ( {E}   {E})  ", "  (  \u03c9  )   ", "  (\")_(\")   "],
-  ],
-  dragon: [
-    ["            ", "  /^\\  /^\\  ", " <  {E}  {E}  > ", " (   ~~   ) ", "  `-vvvv-'  "],
-    ["            ", "  /^\\  /^\\  ", " <  {E}  {E}  > ", " (        ) ", "  `-vvvv-'  "],
-    ["   ~    ~   ", "  /^\\  /^\\  ", " <  {E}  {E}  > ", " (   ~~   ) ", "  `-vvvv-'  "],
-  ],
-  octopus: [
-    ["            ", "   .----.   ", "  ( {E}  {E} )  ", "  (______)  ", "  /\\/\\/\\/\\  "],
-    ["            ", "   .----.   ", "  ( {E}  {E} )  ", "  (______)  ", "  \\/\\/\\/\\/  "],
-    ["     o      ", "   .----.   ", "  ( {E}  {E} )  ", "  (______)  ", "  /\\/\\/\\/\\  "],
-  ],
-  owl: [
-    ["            ", "   /\\  /\\   ", "  (({E})({E}))  ", "  (  ><  )  ", "   `----'   "],
-    ["            ", "   /\\  /\\   ", "  (({E})({E}))  ", "  (  ><  )  ", "   .----.   "],
-    ["            ", "   /\\  /\\   ", "  (({E})(-))  ", "  (  ><  )  ", "   `----'   "],
-  ],
-  penguin: [
-    ["            ", "  .---.     ", "  ({E}>{E})     ", " /(   )\\    ", "  `---'     "],
-    ["            ", "  .---.     ", "  ({E}>{E})     ", " |(   )|    ", "  `---'     "],
-    ["  .---.     ", "  ({E}>{E})     ", " /(   )\\    ", "  `---'     ", "   ~ ~      "],
-  ],
-  turtle: [
-    ["            ", "   _,--._   ", "  ( {E}  {E} )  ", " /[______]\\ ", "  ``    ``  "],
-    ["            ", "   _,--._   ", "  ( {E}  {E} )  ", " /[______]\\ ", "   ``  ``   "],
-    ["            ", "   _,--._   ", "  ( {E}  {E} )  ", " /[======]\\ ", "  ``    ``  "],
-  ],
-  snail: [
-    ["            ", " {E}    .--.  ", "  \\  ( @ )  ", "   \\_`--'   ", "  ~~~~~~~   "],
-    ["            ", "  {E}   .--.  ", "  |  ( @ )  ", "   \\_`--'   ", "  ~~~~~~~   "],
-    ["            ", " {E}    .--.  ", "  \\  ( @  ) ", "   \\_`--'   ", "   ~~~~~~   "],
-  ],
-  ghost: [
-    ["            ", "   .----.   ", "  / {E}  {E} \\  ", "  |      |  ", "  ~`~``~`~  "],
-    ["            ", "   .----.   ", "  / {E}  {E} \\  ", "  |      |  ", "  `~`~~`~`  "],
-    ["    ~  ~    ", "   .----.   ", "  / {E}  {E} \\  ", "  |      |  ", "  ~~`~~`~~  "],
-  ],
-  axolotl: [
-    ["            ", "}~(______)~{", "}~({E} .. {E})~{", "  ( .--. )  ", "  (_/  \\_)  "],
-    ["            ", "~}(______){~", "~}({E} .. {E}){~", "  ( .--. )  ", "  (_/  \\_)  "],
-    ["            ", "}~(______)~{", "}~({E} .. {E})~{", "  (  --  )  ", "  ~_/  \\_~  "],
-  ],
-  capybara: [
-    ["            ", "  n______n  ", " ( {E}    {E} ) ", " (   oo   ) ", "  `------'  "],
-    ["            ", "  n______n  ", " ( {E}    {E} ) ", " (   Oo   ) ", "  `------'  "],
-    ["    ~  ~    ", "  u______n  ", " ( {E}    {E} ) ", " (   oo   ) ", "  `------'  "],
-  ],
-  cactus: [
-    ["            ", " n  ____  n ", " | |{E}  {E}| | ", " |_|    |_| ", "   |    |   "],
-    ["            ", "    ____    ", " n |{E}  {E}| n ", " |_|    |_| ", "   |    |   "],
-    [" n        n ", " |  ____  | ", " | |{E}  {E}| | ", " |_|    |_| ", "   |    |   "],
-  ],
-  robot: [
-    ["            ", "   .[||].   ", "  [ {E}  {E} ]  ", "  [ ==== ]  ", "  `------'  "],
-    ["            ", "   .[||].   ", "  [ {E}  {E} ]  ", "  [ -==- ]  ", "  `------'  "],
-    ["     *      ", "   .[||].   ", "  [ {E}  {E} ]  ", "  [ ==== ]  ", "  `------'  "],
-  ],
-  rabbit: [
-    ["            ", "   (\\__/)   ", "  ( {E}  {E} )  ", " =(  ..  )= ", "  (\")__(\")" ],
-    ["            ", "   (|__/)   ", "  ( {E}  {E} )  ", " =(  ..  )= ", "  (\")__(\")" ],
-    ["            ", "   (\\__/)   ", "  ( {E}  {E} )  ", " =( .  . )= ", "  (\")__(\")" ],
-  ],
-  mushroom: [
-    ["            ", " .-o-OO-o-. ", "(__________)","   |{E}  {E}|   ", "   |____|   "],
-    ["            ", " .-O-oo-O-. ", "(__________)","   |{E}  {E}|   ", "   |____|   "],
-    ["   . o  .   ", " .-o-OO-o-. ", "(__________)","   |{E}  {E}|   ", "   |____|   "],
-  ],
-  chonk: [
-    ["            ", "  /\\    /\\  ", " ( {E}    {E} ) ", " (   ..   ) ", "  `------'  "],
-    ["            ", "  /\\    /|  ", " ( {E}    {E} ) ", " (   ..   ) ", "  `------'  "],
-    ["            ", "  /\\    /\\  ", " ( {E}    {E} ) ", " (   ..   ) ", "  `------'~ "],
-  ],
-};
+export const SPECIES_ART: Record<string, string[][]> = buildSpeciesArt();
 
-// ─── Hat art ────────────────────────────────────────────────────────────────
-
-export const HAT_ART: Record<Hat, string> = {
-  none:      "",
-  crown:     "   \\^^^/    ",
-  tophat:    "   [___]    ",
-  propeller: "    -+-     ",
-  halo:      "   (   )    ",
-  wizard:    "    /^\\     ",
-  beanie:    "   (___)    ",
-  tinyduck:  "    ,>      ",
-};
+// Hat art is now centralized in packs.ts (BARE_HATS + renderHatLine)
 
 // ─── Rarity ANSI colors ────────────────────────────────────────────────────
 
@@ -188,10 +87,10 @@ export function renderCompanionCard(
   const shiny = bones.shiny ? `${SHINY_COLOR}\u2728 ${NC}` : "";
   const art = getArtFrame(bones.species, bones.eye, frame);
 
-  // Hat: replace first empty art line
-  const hatLine = HAT_ART[bones.hat];
-  if (hatLine && !art[0].trim()) {
-    art[0] = hatLine;
+  // Hat: centered on species width with per-species offset
+  const hatStr = renderHatLine(bones.hat, bones.species, frame);
+  if (hatStr && !art[0].trim()) {
+    art[0] = hatStr;
   }
 
   // Build the card
@@ -303,10 +202,10 @@ export function renderCompanionCardMarkdown(
   const shiny = bones.shiny ? " \u2728" : "";
   const art = getArtFrame(bones.species, bones.eye, frame);
 
-  // Hat: replace first empty art line
-  const hatLine = HAT_ART[bones.hat];
-  if (hatLine && !art[0].trim()) {
-    art[0] = hatLine;
+  // Hat: centered on species width with per-species offset
+  const hatStr = renderHatLine(bones.hat, bones.species, frame);
+  if (hatStr && !art[0].trim()) {
+    art[0] = hatStr;
   }
 
   // Strip empty lines from art for cleaner rendering

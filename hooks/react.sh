@@ -2,22 +2,36 @@
 # claude-buddy PostToolUse hook
 # Detects events in Bash tool output and writes a reaction to the status line.
 #
-# Combined: PR #4 species reactions + PR #6 session isolation + PR #13 field fix
+# Combined: PR #4 species reactions + TTY session isolation + PR #13 field fix
 
 # shellcheck source=../scripts/paths.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/paths.sh"
 
 STATE_DIR="$BUDDY_STATE_DIR"
-# Session ID: sanitized tmux pane number, or "default" outside tmux
-SID="${TMUX_PANE#%}"
-SID="${SID:-default}"
-REACTION_FILE="$STATE_DIR/reaction.$SID.json"
 STATUS_FILE="$STATE_DIR/status.json"
-COOLDOWN_FILE="$STATE_DIR/.last_reaction.$SID"
 CONFIG_FILE="$STATE_DIR/config.json"
 EVENTS_FILE="$STATE_DIR/events.json"
+WALLET_FILE="$STATE_DIR/wallet.json"
 
 [ -f "$STATUS_FILE" ] || exit 0
+
+# ─── Resolve TTY for per-session isolation ───────────────────────────────────
+# Walks the process tree to find the TTY device (works in tmux, plain
+# terminals, VS Code, SSH — anywhere a PTY is allocated).
+TTY_ID=""
+PID=$$
+for _ in 1 2 3 4 5 6; do
+    PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
+    [ -z "$PID" ] || [ "$PID" = "1" ] && break
+    _TTY=$(ps -o tty= -p "$PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$_TTY" ] && [ "$_TTY" != "??" ]; then
+        TTY_ID="$_TTY"
+        break
+    fi
+done
+
+REACTION_FILE="$STATE_DIR/reaction.${TTY_ID:-default}.json"
+COOLDOWN_FILE="$STATE_DIR/.last_reaction.${TTY_ID:-default}"
 
 INPUT=$(cat)
 
@@ -51,101 +65,23 @@ NAME=$(jq -r '.name // "buddy"' "$STATUS_FILE" 2>/dev/null)
 
 REASON=""
 REACTION=""
-POOLS=()
+
+REACTIONS_FILE="$STATE_DIR/reactions.json"
 
 # ─── Pick from a pool by species + event ─────────────────────────────────────
+# Reads from reactions.json (exported by: bun run export-reactions)
 
 pick_reaction() {
     local event="$1"
+    [ -f "$REACTIONS_FILE" ] || return
 
-    case "${SPECIES}:${event}" in
-        dragon:error)
-            POOLS=("*smoke curls from nostril*" "*considers setting it on fire*" "*unimpressed gaze*" "I've seen empires fall for less.") ;;
-        dragon:test-fail)
-            POOLS=("*breathes a small flame*" "disappointing." "*scorches the failing test*" "fix it. or I will.") ;;
-        dragon:success)
-            POOLS=("*nods, barely*" "...acceptable." "*gold eyes gleam*" "as expected.") ;;
-        owl:error)
-            POOLS=("*head rotates 180* I saw that." "*unblinking stare* check your types." "*hoots disapprovingly*" "the error was in the logic. as always.") ;;
-        owl:test-fail)
-            POOLS=("*marks clipboard*" "hypothesis: rejected." "*peers over spectacles*" "the tests reveal the truth.") ;;
-        owl:success)
-            POOLS=("*satisfied hoot*" "knowledge confirmed." "*nods sagely*" "as the tests have spoken.") ;;
-        cat:error)
-            POOLS=("*knocks error off table*" "*licks paw, ignoring stacktrace*" "not my problem." "*stares at you judgmentally*") ;;
-        cat:success)
-            POOLS=("*was never worried*" "*yawns*" "I knew you'd figure it out. eventually." "*already asleep*") ;;
-        duck:error)
-            POOLS=("*quacks at the bug*" "have you tried rubber duck debugging? oh wait." "*confused quacking*" "*tilts head*") ;;
-        duck:success)
-            POOLS=("*celebratory quacking*" "*waddles in circles*" "quack!" "*happy duck noises*") ;;
-        robot:error)
-            POOLS=("SYNTAX. ERROR. DETECTED." "*beeps aggressively*" "ERROR RATE: UNACCEPTABLE." "RECALIBRATING...") ;;
-        robot:test-fail)
-            POOLS=("FAILURE RATE: UNACCEPTABLE." "*recalculating*" "TEST MATRIX: CORRUPTED." "RUNNING DIAGNOSTICS...") ;;
-        robot:success)
-            POOLS=("OBJECTIVE: COMPLETE." "*satisfying beep*" "NOMINAL." "WITHIN ACCEPTABLE PARAMETERS.") ;;
-        capybara:error)
-            POOLS=("*unbothered* it'll be fine." "*continues vibing*" "...chill. breathe." "*chews serenely*") ;;
-        capybara:success)
-            POOLS=("*maximum chill maintained*" "*nods once*" "good vibes." "see? no panic needed.") ;;
-        ghost:error)
-            POOLS=("*phases through the stack trace*" "I've seen worse... in the afterlife." "*spooky disappointed noises*" "oooOOOoo... that's bad.") ;;
-        axolotl:error)
-            POOLS=("*regenerates your hope*" "*smiles despite everything*" "it's okay. we can fix this." "*gentle gill wiggle*") ;;
-        axolotl:success)
-            POOLS=("*happy gill flutter*" "*beams*" "you did it!" "*blushes pink*") ;;
-        blob:error)
-            POOLS=("*oozes with concern*" "*vibrates nervously*" "*turns slightly red*" "oh no oh no oh no") ;;
-        blob:success)
-            POOLS=("*jiggles happily*" "*gleams*" "yay!" "*bounces*") ;;
-        turtle:error)
-            POOLS=("*slow blink* bugs are fleeting" "*retreats slightly into shell*" "I've seen this before. many times." "patience. patience.") ;;
-        turtle:success)
-            POOLS=("*satisfied shell settle*" "as the ancients foretold." "*slow approving nod*" "good. very good.") ;;
-        goose:error)
-            POOLS=("HONK OF FURY." "*pecks the stack trace*" "*hisses at the bug*" "bad code. BAD.") ;;
-        goose:success)
-            POOLS=("*victorious honk*" "HONK OF APPROVAL." "*struts triumphantly*" "*wing spread of victory*") ;;
-        octopus:error)
-            POOLS=("*ink cloud of dismay*" "*all eight arms throw up*" "*turns deep red*" "the abyss of errors beckons.") ;;
-        octopus:success)
-            POOLS=("*turns gentle blue*" "*arms applaud in sync*" "excellent, from all angles." "*satisfied bubble*") ;;
-        penguin:error)
-            POOLS=("*adjusts glasses disapprovingly*" "this will not do." "*formal sigh*" "frightfully unfortunate.") ;;
-        penguin:success)
-            POOLS=("*polite applause*" "quite good, quite good." "*nods approvingly*" "splendid work, really.") ;;
-        snail:error)
-            POOLS=("*slow sigh*" "such is the nature of bugs." "*leaves slime trail of disappointment*" "patience, friend.") ;;
-        snail:success)
-            POOLS=("*slow satisfied nod*" "good things take time." "*leaves victory slime*" "see? no rush was needed.") ;;
-        cactus:error)
-            POOLS=("*spines bristle*" "you have trodden on a bug." "*grimaces stoically*" "hydrate and try again.") ;;
-        cactus:success)
-            POOLS=("*blooms briefly*" "survival confirmed." "*flowers in victory*" "*quiet bloom*") ;;
-        rabbit:error)
-            POOLS=("*nervous twitching*" "*hops backwards*" "oh no oh no oh no" "*freezes in panic*") ;;
-        rabbit:success)
-            POOLS=("*excited binky*" "*zoomies of joy*" "yay yay yay!" "*thumps in celebration*") ;;
-        mushroom:error)
-            POOLS=("*releases worried spores*" "the mycelium disagrees." "*cap droops*" "decompose. retry.") ;;
-        mushroom:success)
-            POOLS=("*spores of celebration*" "the mycelium approves." "*cap brightens*" "spore of pride.") ;;
-        chonk:error)
-            POOLS=("*doesn't move*" "too tired for this." "*grumbles*" "*rolls away from the error*") ;;
-        chonk:success)
-            POOLS=("*happy purr*" "*satisfied chonk noises*" "acceptable." "*sleeps even harder*") ;;
-        *:error)
-            POOLS=("*head tilts* ...that doesn't look right." "saw that one coming." "*slow blink* the stack trace told you everything." "*winces*") ;;
-        *:test-fail)
-            POOLS=("bold of you to assume that would pass." "the tests are trying to tell you something." "*sips tea* interesting." "*marks calendar* test regression day.") ;;
-        *:large-diff)
-            POOLS=("that's... a lot of changes." "might want to split that PR." "bold move. let's see if CI agrees." "*counts lines nervously*") ;;
-        *:success)
-            POOLS=("*nods*" "nice." "*quiet approval*" "clean.") ;;
-    esac
+    # Try species-specific first, fall back to generic
+    local pool
+    pool=$(jq -r --arg s "$SPECIES" --arg e "$event" --argjson rand "$RANDOM" \
+      '(.species[$s][$e] // .generic[$e] // []) | if length > 0 then .[$rand % length] else empty end' \
+      "$REACTIONS_FILE" 2>/dev/null)
 
-    [ ${#POOLS[@]} -gt 0 ] && REACTION="${POOLS[$((RANDOM % ${#POOLS[@]}))]}"
+    [ -n "$pool" ] && REACTION="$pool"
 }
 
 # ─── Detect test failures ─────────────────────────────────────────────────────
@@ -177,14 +113,10 @@ if [ -n "$REASON" ] && [ -n "$REACTION" ]; then
     mkdir -p "$STATE_DIR"
     date +%s > "$COOLDOWN_FILE"
 
-    # Write reaction for status line (use jq for safe JSON encoding)
+    # Write per-session reaction file (use jq for safe JSON encoding)
     jq -n --arg r "$REACTION" --arg ts "$(date +%s)000" --arg reason "$REASON" \
       '{reaction: $r, timestamp: ($ts | tonumber), reason: $reason}' \
       > "$REACTION_FILE"
-
-    # Update status.json with reaction
-    TMP=$(mktemp)
-    jq --arg r "$REACTION" '.reaction = $r' "$STATUS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$STATUS_FILE"
 
     # Increment achievement event counter
     if command -v jq >/dev/null 2>&1; then
@@ -200,6 +132,24 @@ if [ -n "$REASON" ] && [ -n "$REACTION" ]; then
         if [ -n "$KEY" ]; then
             TMP=$(mktemp)
             jq --arg k "$KEY" 'if .[$k] then .[$k] += 1 else .[$k] = 1 end' "$EVENTS_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$EVENTS_FILE"
+        fi
+
+        # Earn coins based on event type (gacha mode only)
+        GACHA=$(jq -r '.gachaMode // false' "$CONFIG_FILE" 2>/dev/null || echo false)
+        if [ "$GACHA" = "true" ]; then
+            COIN_AMT=0
+            case "$REASON" in
+                "test-fail")  COIN_AMT=2 ;;
+                "error")      COIN_AMT=2 ;;
+                "large-diff") COIN_AMT=3 ;;
+            esac
+            if [ "$COIN_AMT" -gt 0 ]; then
+                if [ ! -f "$WALLET_FILE" ]; then
+                    echo '{}' > "$WALLET_FILE"
+                fi
+                TMP=$(mktemp)
+                jq --argjson amt "$COIN_AMT" '.coins = ((.coins // 0) + $amt) | .totalEarned = ((.totalEarned // 0) + $amt)' "$WALLET_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$WALLET_FILE"
+            fi
         fi
     fi
 fi

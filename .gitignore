@@ -28,6 +28,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Species development templates (WIP)
+species-dev/
+
 # Test / coverage
 coverage/
 .nyc_output/

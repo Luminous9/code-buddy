@@ -36,7 +36,8 @@ import {
   type Companion, type StatName, type Species, type Rarity,
   type SearchCriteria, type SearchResult, type BuddyBones,
 } from "../server/engine.ts";
-import { getArtFrame, HAT_ART } from "../server/art.ts";
+import { getArtFrame } from "../server/art.ts";
+import { renderHatLine } from "../server/packs.ts";
 import {
   ACHIEVEMENTS, loadUnlocked, loadEvents,
   type Achievement, type UnlockedAchievement, type EventCounters,
@@ -264,12 +265,14 @@ function BuddyListPane({ slots, cursor, activeSlot, focused, searchTerm }: {
 // ─── Middle: Settings List ──────────────────────────────────────────────────
 
 const SETTINGS_ITEMS = [
+  { key: "hostType", label: "Host Type" },
   { key: "commentCooldown", label: "Comment Cooldown" },
   { key: "reactionTTL", label: "Reaction TTL" },
   { key: "bubbleStyle", label: "Bubble Style" },
   { key: "bubblePosition", label: "Bubble Position" },
   { key: "showRarity", label: "Show Rarity" },
   { key: "statusLineEnabled", label: "Status Line" },
+  { key: "gachaMode", label: "Gacha Mode" },
 ] as const;
 
 function SettingsListPane({ cursor, config, focused }: {
@@ -319,6 +322,11 @@ const ACHIEVEMENT_PROGRESS: Record<string, { counter: keyof EventCounters; thres
   power_user: { counter: "commands_run", threshold: 50 },
   dedicated: { counter: "turns", threshold: 200 },
   thousand_turns: { counter: "turns", threshold: 1000 },
+  first_pull: { counter: "pulls_total", threshold: 1 },
+  high_roller: { counter: "pulls_total", threshold: 25 },
+  whale: { counter: "pulls_total", threshold: 100 },
+  jackpot: { counter: "legendary_pulls", threshold: 1 },
+  shiny_hunter: { counter: "shiny_pulls", threshold: 1 },
 };
 
 function AchievementsListPane({ cursor, unlockedIds, focused }: {
@@ -1272,8 +1280,8 @@ function BuddyCardPane({ companion, slot, isActive, editablePersonality, editCur
   const stars = RARITY_STARS[b.rarity];
   const shiny = b.shiny ? " ✨" : "";
   const art = getArtFrame(b.species, b.eye, 0);
-  const hatLine = HAT_ART[b.hat];
-  if (hatLine && !art[0].trim()) art[0] = hatLine;
+  const hatStr = renderHatLine(b.hat, b.species, 0);
+  if (hatStr && !art[0].trim()) art[0] = hatStr;
   const reaction = loadReaction();
   const isEditing = typeof editablePersonality === "string";
   const displayPersonality = isEditing ? editablePersonality! : companion.personality;
@@ -1369,12 +1377,14 @@ interface SettingDef {
 }
 
 const SETTING_DEFS: SettingDef[] = [
+  { key: "hostType", label: "Host Type", description: ["Default host for buddy integrations.", "", "claude → use Claude-oriented defaults", "codex  → use Codex-oriented defaults", "", "Currently used by soul generation."], type: "options", options: ["claude", "codex"], default: "claude" },
   { key: "commentCooldown", label: "Comment Cooldown", description: ["Minimum seconds between", "buddy status line comments.", "", "Lower = chatty, Higher = quiet"], type: "number", min: 0, default: "30" },
   { key: "reactionTTL", label: "Reaction TTL", description: ["How long reactions stay", "visible in status line.", "", "0 = permanent"], type: "number", min: 0, default: "0" },
   { key: "bubbleStyle", label: "Bubble Style", description: ["Speech bubble style.", "", 'classic → "quoted"', "round → (parens)"], type: "options", options: ["classic", "round"], default: "classic" },
   { key: "bubblePosition", label: "Bubble Position", description: ["Bubble placement.", "", "top → above buddy", "left → beside buddy"], type: "options", options: ["top", "left"], default: "top" },
   { key: "showRarity", label: "Show Rarity", description: ["Show rarity stars in", "the status line.", "", "true → ★★★★ visible", "false → hidden"], type: "options", options: ["true", "false"], default: "true" },
   { key: "statusLineEnabled", label: "Status Line", description: ["Animated buddy in Claude Code's", "status line bar.", "", "true  → patches settings.json", "false → removes it", "", "Restart Claude Code after toggle."], type: "options", options: ["true", "false"], default: "false" },
+  { key: "gachaMode", label: "Gacha Mode", description: ["Toggle the coin economy.", "", "true  → earn coins, do pulls", "         hunt/pick search disabled", "false → free hunt/pick acquisition", "         coin economy disabled"], type: "options", options: ["true", "false"], default: "false" },
 ];
 
 function SettingDetailPane({ settingIndex, config, editing, numInput, optCursor }: {
@@ -1887,7 +1897,7 @@ function App() {
             hatchedAt: Date.now(),
             userId: chosen.userId,
           };
-          saveCompanionSlot(companion, slot);
+          saveCompanionSlot(slot, companion);
           saveActiveSlot(slot);
           writeStatusState(companion, `*${name} arrives*`);
           setMessage(`✓ ${name} saved to slot "${slot}"`);

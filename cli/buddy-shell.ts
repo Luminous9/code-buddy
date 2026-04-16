@@ -37,7 +37,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buddyStateDir } from "../server/path.ts";
-import { getArtFrame, HAT_ART } from "../server/art.ts";
+import { getArtFrame } from "../server/art.ts";
+import { renderHatLine } from "../server/packs.ts";
 import type { Species, Eye, Hat } from "../server/engine.ts";
 import { getBiome, listBiomes } from "./biomes.ts";
 import xtermPkg from "@xterm/headless";
@@ -371,8 +372,8 @@ function setupPanel() {
   let artLines: string[] = [];
   try {
     artLines = getArtFrame(s.species as Species, s.eye as Eye, 0);
-    const hatLine = HAT_ART[s.hat as Hat];
-    if (hatLine && artLines[0] && !artLines[0].trim()) artLines[0] = hatLine;
+    const hatStr = renderHatLine(s.hat, s.species, 0);
+    if (hatStr && artLines[0] && !artLines[0].trim()) artLines[0] = hatStr;
     artLines = artLines.filter(l => l.trim());
   } catch {
     artLines = [s.face || "(??)"];

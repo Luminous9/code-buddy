@@ -18,6 +18,7 @@
 import {
   loadActiveSlot, saveActiveSlot, listCompanionSlots,
   loadCompanionSlot, saveCompanionSlot, slugify, unusedName, writeStatusState,
+  isGachaMode,
 } from "../server/state.ts";
 import {
   generateBones, SPECIES, RARITIES, STAT_NAMES, RARITY_STARS,
@@ -79,7 +80,7 @@ function rpad(s: string, w: number): string {
 
 // ─── Option lists ─────────────────────────────────────────────────────────────
 
-const SP_OPTS = ["any", ...SPECIES]    as const;
+const SP_OPTS = ["any", ...SPECIES];
 const RA_OPTS = ["any", ...RARITIES]   as const;
 const SH_OPTS = ["any", "yes", "no"]   as const;
 const ST_OPTS = ["any", ...STAT_NAMES] as const;
@@ -137,7 +138,8 @@ const LEFT_W = 36;
 
 function savedPane(s: State): string[] {
   const lines: string[] = [];
-  lines.push(`${B}  Your Menagerie${N}  ${GR}[s] search${N}`);
+  const searchHint = isGachaMode() ? `${D}[s] \u2718${N}` : `${GR}[s] search${N}`;
+  lines.push(`${B}  Your Menagerie${N}  ${searchHint}`);
   lines.push(GR + "  " + "─".repeat(LEFT_W - 2) + N);
 
   if (s.savedSlots.length === 0) {
@@ -370,7 +372,7 @@ function onKey(key: string, s: State): boolean {
           personality: `A ${r.bones.rarity} ${r.bones.species} who watches code with quiet intensity.`,
           hatchedAt: Date.now(), userId: r.userId,
         };
-        saveCompanionSlot(companion, slot);
+        saveCompanionSlot(slot, companion);
         saveActiveSlot(slot);
         writeStatusState(companion, `*${name} arrives*`);
         s.message = `✓ ${name} saved to slot "${slot}" and set as active!`;
@@ -385,7 +387,10 @@ function onKey(key: string, s: State): boolean {
 
     case "saved": {
       if (key === "q")                          return true;
-      if (key === "s")                          { s.mode = "criteria"; break; }
+      if (key === "s") {
+        if (isGachaMode()) { s.message = "Gacha mode is on — search disabled. Use bun run pull."; break; }
+        s.mode = "criteria"; break;
+      }
       if (key === "\x1b[A" || key === "k")      s.savedCursor = clamp(s.savedCursor - 1, 0, s.savedSlots.length - 1);
       else if (key === "\x1b[B" || key === "j") s.savedCursor = clamp(s.savedCursor + 1, 0, s.savedSlots.length - 1);
       else if (key === "r") {
