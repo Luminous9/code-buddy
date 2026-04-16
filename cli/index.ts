@@ -53,6 +53,9 @@ switch (command) {
   case "upgrade":
     await import("./upgrade.ts");
     break;
+  case "pull":
+    await import("./pull.ts");
+    break;
   case "enable":
     await import("./install.ts");
     break;
@@ -82,14 +85,17 @@ Buddy:
   show              Display your current buddy
   pick              Interactive two-pane buddy picker (browse saved + search)
   hunt              Search for a specific buddy (non-interactive)
+  pull              Gacha pull — spend coins to hatch a random buddy
   verify            Verify what buddy your current ID produces
 
   upgrade           Pull latest version + reinstall (add --check to just check)
 
 Settings:
   settings          Show current settings
+  settings host claude|codex  Set the default host for buddy integrations
   settings cooldown <n>  Set comment cooldown (0-300 seconds)
   settings ttl <n>       Set reaction display duration (0-300s, 0 = permanent)
+  settings gacha on|off  Toggle gacha mode (coin economy + pulls vs free hunt/pick)
 
 Diagnostics:
   doctor            Run diagnostic report (paste output in bug reports)
@@ -102,6 +108,8 @@ In Claude Code:
   /buddy stats      Detailed stat card
   /buddy off        Mute reactions
   /buddy on         Unmute reactions
+  /buddy pull       Gacha pull — spend coins to hatch a random buddy
+  /buddy wallet     Check coin balance and pity progress
   /buddy rename     Rename companion (1-14 chars)
   /buddy personality  Set custom personality text
   /buddy summon     Summon a saved buddy (omit slot for random)

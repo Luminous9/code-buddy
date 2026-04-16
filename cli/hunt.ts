@@ -13,7 +13,7 @@ import {
 } from "../server/engine.ts";
 import {
   saveCompanionSlot, saveActiveSlot, writeStatusState,
-  slugify, unusedName, listCompanionSlots,
+  slugify, unusedName, listCompanionSlots, isGachaMode,
 } from "../server/state.ts";
 import { createInterface } from "readline";
 
@@ -45,6 +45,12 @@ function pickFromList<T extends string>(label: string, items: readonly T[]): Pro
 }
 
 async function main() {
+  if (isGachaMode()) {
+    console.log("\n  Gacha mode is on — free buddy hunting is disabled.");
+    console.log("  Use \`bun run pull\` to spend coins on a gacha pull.\n");
+    console.log("  To disable gacha: bun run settings gacha off\n");
+    process.exit(0);
+  }
   console.log(`
 ${CYAN}╔══════════════════════════════════════════════════════════╗${NC}
 ${CYAN}║${NC}  ${BOLD}claude-buddy hunt${NC} — find your perfect companion          ${CYAN}║${NC}
@@ -152,7 +158,7 @@ ${CYAN}╚═══════════════════════�
     userId: chosen.userId,
   };
 
-  saveCompanionSlot(companion, slot);
+  saveCompanionSlot(slot, companion);
   saveActiveSlot(slot);
   writeStatusState(companion, `*${chosenName} arrives*`);
 

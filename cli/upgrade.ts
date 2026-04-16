@@ -156,11 +156,27 @@ function printSummary(oldVersion: string, commits: string[]) {
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
+const skipGit = args.includes("--skip-git");
 
 banner();
 
 const oldVersion = getCurrentVersion();
 info(`Current version: ${oldVersion}\n`);
+
+if (skipGit) {
+  info("Skipping git sync (--skip-git)\n");
+
+  if (!installDeps()) {
+    process.exit(1);
+  }
+
+  if (!reinstallBuddy()) {
+    process.exit(1);
+  }
+
+  printSummary(oldVersion, []);
+  process.exit(0);
+}
 
 if (!checkGitRepo()) {
   process.exit(1);

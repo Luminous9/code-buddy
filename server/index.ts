@@ -22,6 +22,7 @@ import {
   type Rarity,
   type StatName,
   type Companion,
+  type BuddyBones,
 } from "./engine.ts";
 import {
   loadCompanion,
@@ -38,11 +39,13 @@ import {
   unusedName,
   loadCompanionSlot,
   saveCompanionSlot,
+  updateCompanionSlot,
   deleteCompanionSlot,
   listCompanionSlots,
   setBuddyStatusLine,
   unsetBuddyStatusLine,
   cleanupPluginState,
+  isGachaMode,
 } from "./state.ts";
 import {
   buddyStateDir,
@@ -51,12 +54,19 @@ import {
 } from "./path.ts";
 import {
   getReaction, generatePersonalityPrompt,
+  buildPersonalityBlock, inspirationSeed,
 } from "./reactions.ts";
 import { renderCompanionCardMarkdown } from "./art.ts";
 import {
   incrementEvent, checkAndAward, trackActiveDay,
   renderAchievementsCardMarkdown,
 } from "./achievements.ts";
+import {
+  loadWallet, saveWallet, earnCoins, spendCoins, canAfford,
+  PULL_COST,
+} from "./wallet.ts";
+import { pullBuddy, updatePity, hatchFlavorText } from "./pull.ts";
+import { getAvailablePacks, getCurrentRotationPack, getPackSpeciesIds } from "./packs.ts";
 
 function getInstructions(): string {
   const companion = loadCompanion();
@@ -118,7 +128,7 @@ function ensureCompanion(): Companion {
     userId,
   };
   const slot = slugify(name);
-  saveCompanionSlot(companion, slot);
+  saveCompanionSlot(slot, companion);
   saveActiveSlot(slot);
   writeStatusState(companion);
 
@@ -137,9 +147,33 @@ function activeSlot(): string {
 
 server.tool(
   "buddy_show",
-  "Show the coding companion with full ASCII art card, stats, and personality",
-  {},
-  async () => {
+  "Show a buddy's full ASCII art card, stats, and personality. Defaults to the active buddy; pass a slot name to show any buddy without switching.",
+  {
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to show. If omitted, shows the active buddy."),
+  },
+  async ({ slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      const card = renderCompanionCardMarkdown(
+        target.bones,
+        target.name,
+        target.personality,
+        `*${target.name} appears*`,
+      );
+      incrementEvent("commands_run", 1, slot);
+      return { content: [{ type: "text", text: card }] };
+    }
+
     const companion = ensureCompanion();
     const reaction = loadReaction();
     const reactionText =
@@ -178,6 +212,7 @@ server.tool(
     saveReaction(reaction, "pet");
     writeStatusState(companion, reaction);
     incrementEvent("pets", 1, activeSlot());
+    if (isGachaMode()) earnCoins(1);
 
     const face = renderFace(companion.bones.species, companion.bones.eye);
     return {
@@ -253,15 +288,52 @@ server.tool(
 
 server.tool(
   "buddy_rename",
-  "Rename your coding companion",
+  "Rename a buddy. Targets the active buddy by default, or a specific buddy by slot name.",
   {
     name: z
       .string()
       .min(1)
       .max(14)
       .describe("New name for your buddy (1-14 characters)"),
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to rename. If omitted, renames the active buddy."),
   },
-  async ({ name }) => {
+  async ({ name, slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      const newSlot = slugify(name);
+      if (newSlot !== slot && loadCompanionSlot(newSlot)) {
+        return {
+          content: [{ type: "text", text: `A buddy in slot "${newSlot}" already exists. Pick a different name.` }],
+        };
+      }
+      const oldName = target.name;
+      target.name = name;
+      if (newSlot !== slot) {
+        deleteCompanionSlot(slot);
+        saveCompanionSlot(newSlot, target);
+        // Update active slot if it pointed to the old slot
+        if (loadActiveSlot() === slot) {
+          saveActiveSlot(newSlot);
+        }
+      } else {
+        updateCompanionSlot(slot, target);
+      }
+      incrementEvent("commands_run", 1, newSlot);
+      return {
+        content: [{ type: "text", text: `Renamed: ${oldName} [${slot}] \u2192 ${name} [${newSlot}]` }],
+      };
+    }
+
     const companion = ensureCompanion();
     const oldName = companion.name;
     companion.name = name;
@@ -279,15 +351,36 @@ server.tool(
 
 server.tool(
   "buddy_set_personality",
-  "Set a custom personality description for your buddy",
+  "Set a custom personality description for a buddy. Targets the active buddy by default, or a specific buddy by slot name.",
   {
     personality: z
       .string()
       .min(1)
       .max(500)
       .describe("Personality description (1-500 chars)"),
+    slot: z
+      .string()
+      .min(1)
+      .max(14)
+      .optional()
+      .describe("Slot name of the buddy to update. If omitted, updates the active buddy."),
   },
-  async ({ personality }) => {
+  async ({ personality, slot }) => {
+    if (slot) {
+      const target = loadCompanionSlot(slot);
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `No buddy found in slot "${slot}".` }],
+        };
+      }
+      target.personality = personality;
+      updateCompanionSlot(slot, target);
+      incrementEvent("commands_run", 1, slot);
+      return {
+        content: [{ type: "text", text: `Personality updated for ${target.name} [${slot}].` }],
+      };
+    }
+
     const companion = ensureCompanion();
     companion.personality = personality;
     saveCompanion(companion);
@@ -326,6 +419,9 @@ server.tool(
       "  /buddy list       List all saved buddies",
       "  /buddy pick       Generate a new random buddy (optional: species, rarity)",
       "  /buddy dismiss    Remove a saved buddy slot",
+      "  /buddy pull       Gacha pull — spend coins to hatch a random buddy",
+      "  /buddy wallet     Check coin balance and pity progress",
+      "  /buddy gacha      Show or toggle gacha mode (on/off)",
       "  /buddy frequency  Show or set comment cooldown (tmux only)",
       "  /buddy style      Show or set bubble style (tmux only)",
       "  /buddy position   Show or set bubble position (tmux only)",
@@ -337,6 +433,7 @@ server.tool(
       "  bun run show            Display buddy in terminal",
       "  bun run pick            Interactive buddy picker",
       "  bun run hunt            Search for specific buddy",
+      "  bun run pull            Gacha pull with egg hatch animation",
       "  bun run doctor          Diagnostic report",
       "  bun run disable         Temporarily deactivate buddy",
       "  bun run enable          Re-enable buddy",
@@ -627,6 +724,7 @@ server.tool(
     }
 
     saveActiveSlot(targetSlot);
+    saveReaction(`*${companion.name} arrives*`, "summon");
     writeStatusState(companion, `*${companion.name} arrives*`);
 
     // Uses markdown renderer so the card displays cleanly in Claude Code's UI.
@@ -658,7 +756,7 @@ server.tool(
   async ({ slot }) => {
     const companion = ensureCompanion();
     const targetSlot = slot ? slugify(slot) : slugify(companion.name);
-    saveCompanionSlot(companion, targetSlot);
+    saveCompanionSlot(targetSlot, companion);
     saveActiveSlot(targetSlot);
     return {
       content: [
@@ -753,7 +851,7 @@ server.tool(
   "buddy_pick",
   "Generate a new random buddy and add it to the menagerie. Optionally filter by species and/or rarity. The new buddy becomes the active one.",
   {
-    species: z.enum(SPECIES).optional().describe(
+    species: z.string().optional().describe(
       "Desired species (e.g. 'turtle', 'cat', 'dragon'). If omitted, any species.",
     ),
     rarity: z.enum(RARITIES).optional().describe(
@@ -764,6 +862,11 @@ server.tool(
     ),
   },
   async ({ species, rarity, name }) => {
+    if (isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is enabled — free buddy generation is disabled. Use `buddy_pull` to spend coins on a random pull, or disable gacha with `/buddy gacha off`." }],
+      };
+    }
     const { randomBytes } = await import("crypto");
 
     const maxAttempts =
@@ -798,16 +901,18 @@ server.tool(
       };
     }
 
+    const seed = inspirationSeed(userId);
     const companion: Companion = {
       bones,
       name: buddyName,
-      personality: `A ${bones.rarity} ${bones.species} who watches code with quiet intensity.`,
+      personality: `A ${bones.rarity} ${bones.species} — personality emerging...`,
       hatchedAt: Date.now(),
       userId,
     };
 
-    saveCompanionSlot(companion, slot);
+    saveCompanionSlot(slot, companion);
     saveActiveSlot(slot);
+    saveReaction(`*${buddyName} hatches*`, "pick");
     writeStatusState(companion, `*${buddyName} hatches*`);
 
     const card = renderCompanionCardMarkdown(
@@ -817,7 +922,227 @@ server.tool(
       `*${buddyName} hatches*`,
     );
 
-    return { content: [{ type: "text", text: card }] };
+    const personalityBlock = buildPersonalityBlock(bones, buddyName, seed, slot);
+    return { content: [{ type: "text", text: card + personalityBlock }] };
+  },
+);
+
+// ─── Tool: buddy_wallet ─────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_wallet",
+  "Show current coin balance, earning stats, and pity progress for gacha pulls",
+  {},
+  async () => {
+    if (!isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
+      };
+    }
+    ensureCompanion();
+    incrementEvent("commands_run", 1, activeSlot());
+    const w = loadWallet();
+
+    const pityEpicPct = Math.floor((w.pityEpic / 50) * 100);
+    const pityLegPct = Math.floor((w.pityLegendary / 100) * 100);
+
+    const parts: string[] = [];
+    parts.push(`### \ud83d\udcb0 Wallet`);
+    parts.push("");
+    parts.push(`**Coins:** ${w.coins}`);
+    parts.push(`**Total earned:** ${w.totalEarned} | **Total spent:** ${w.totalSpent}`);
+    parts.push(`**Pulls completed:** ${w.pullCount}`);
+    parts.push("");
+    parts.push(`**Pull cost:** ${PULL_COST} coins`);
+    parts.push("");
+    parts.push(`**Pity progress:**`);
+    parts.push(`- Epic guarantee: ${w.pityEpic}/50 (${pityEpicPct}%)`);
+    parts.push(`- Legendary guarantee: ${w.pityLegendary}/100 (${pityLegPct}%)`);
+    parts.push("");
+    parts.push(`*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`);
+
+    return { content: [{ type: "text", text: parts.join("\n") }] };
+  },
+);
+
+// ─── Tool: buddy_gacha ──────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_gacha",
+  "Toggle gacha mode on or off. When on: earn coins, do pulls, hunt/pick search disabled. When off: free acquisition enabled, coin economy disabled.",
+  {
+    enabled: z.boolean().optional().describe(
+      "Set gacha mode on (true) or off (false). If omitted, shows current status.",
+    ),
+  },
+  async ({ enabled }) => {
+    if (enabled === undefined) {
+      const on = isGachaMode();
+      return {
+        content: [{ type: "text", text: `Gacha mode is **${on ? "ON" : "OFF"}**.\n\n${on ? "Earn coins by coding, spend them on pulls. Hunt and pick search are disabled." : "Free buddy acquisition via hunt/pick is enabled. Coin economy is disabled."}\n\nToggle: \`/buddy gacha on\` or \`/buddy gacha off\`\nCLI: \`bun run settings gacha on\` or \`bun run settings gacha off\`` }],
+      };
+    }
+    saveConfig({ gachaMode: enabled });
+    const label = enabled ? "ON" : "OFF";
+    const detail = enabled
+      ? "Coin economy is now active. Earn coins by coding, spend them on pulls. Hunt and pick search are disabled."
+      : "Free buddy acquisition is now enabled. Coin economy is disabled.";
+    return {
+      content: [{ type: "text", text: `Gacha mode: **${label}**\n\n${detail}` }],
+    };
+  },
+);
+
+// ─── Tool: buddy_packs ──────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_packs",
+  "Show available buddy packs for gacha pulls, including the current weekly featured pack",
+  {},
+  async () => {
+    ensureCompanion();
+    incrementEvent("commands_run", 1, activeSlot());
+
+    const available = getAvailablePacks();
+    const rotation = getCurrentRotationPack();
+
+    const parts: string[] = [];
+    parts.push("### \ud83c\udfb4 Available Packs\n");
+
+    for (const pack of available) {
+      const speciesNames = pack.species.map(s => s.id).join(", ");
+      const isFeatured = rotation && pack.id === rotation.id;
+      const label = isFeatured ? ` \u2728 *Featured this week*` : pack.id === "core" ? " *(always available)*" : "";
+      parts.push(`**${pack.icon} ${pack.name}** (\`${pack.id}\`)${label}`);
+      parts.push(`Species: ${speciesNames}\n`);
+    }
+
+    if (!isGachaMode()) {
+      parts.push("*Gacha mode is off. Enable with `/buddy gacha on` to pull from packs.*");
+    } else {
+      parts.push(`*Pull with: \`buddy_pull pack="core"\` or \`buddy_pull pack="${rotation?.id ?? "core"}"\`*`);
+    }
+
+    return { content: [{ type: "text", text: parts.join("\n") }] };
+  },
+);
+
+// ─── Tool: buddy_pull ───────────────────────────────────────────────────────
+
+server.tool(
+  "buddy_pull",
+  "Spend coins to pull a random buddy from the gacha. Returns a suspenseful egg-hatch reveal followed by the buddy card. Use `! bun run pull` in the terminal for the animated experience.",
+  {
+    keep: z.boolean().optional().describe(
+      "If true (default), keep the pulled buddy. If false, discard it after reveal.",
+    ),
+    name: z.string().min(1).max(14).optional().describe(
+      "Name for the pulled buddy. If omitted, a random name is assigned.",
+    ),
+    pack: z.string().optional().describe(
+      "Pack to pull from (e.g. 'core', 'insects'). If omitted, pulls from all available packs.",
+    ),
+  },
+  async ({ keep, name, pack }) => {
+    if (!isGachaMode()) {
+      return {
+        content: [{ type: "text", text: "Gacha mode is off. Enable it with `/buddy gacha on` or `bun run settings gacha on`." }],
+      };
+    }
+    ensureCompanion();
+    const slot = activeSlot();
+    incrementEvent("commands_run", 1, slot);
+
+    // Validate pack if specified
+    if (pack) {
+      const available = getAvailablePacks();
+      const validIds = available.map(p => p.id);
+      if (!validIds.includes(pack)) {
+        return {
+          content: [{ type: "text", text: `Pack "${pack}" is not available. Available packs: ${validIds.join(", ")}` }],
+        };
+      }
+    }
+
+    if (!canAfford(PULL_COST)) {
+      const w = loadWallet();
+      return {
+        content: [{
+          type: "text",
+          text: `Not enough coins! You have **${w.coins}** coins but need **${PULL_COST}** for a pull.\n\n*Earn coins by coding: turns (+1), errors (+2), test failures (+2), large diffs (+3), sessions (+5), active days (+10), pets (+1).*`,
+        }],
+      };
+    }
+
+    spendCoins(PULL_COST);
+    const shouldKeep = keep !== false;
+
+    let w = loadWallet();
+    const { bones, userId, pityTriggered } = pullBuddy(w, pack);
+
+    // Update pity counters and save
+    w = loadWallet();
+    updatePity(w, bones.rarity);
+    saveWallet(w);
+
+    incrementEvent("pulls_total", 1);
+    if (bones.rarity === "legendary") incrementEvent("legendary_pulls", 1);
+    if (bones.shiny) incrementEvent("shiny_pulls", 1);
+
+    // Build the suspense reveal
+    const flavor = hatchFlavorText(bones.rarity, bones.shiny);
+    const rarityLabel = bones.rarity.toUpperCase();
+    const buddyName = name ?? unusedName();
+    const results: string[] = [];
+
+    if (shouldKeep) {
+      const companion: Companion = {
+        bones,
+        name: buddyName,
+        personality: `A ${bones.rarity} ${bones.species} — personality emerging...`,
+        hatchedAt: Date.now(),
+        userId,
+      };
+      const buddySlot = slugify(buddyName);
+      if (!loadCompanionSlot(buddySlot)) {
+        saveCompanionSlot(buddySlot, companion);
+      }
+
+      // Return rarity reveal + personality prompt — the full card is shown
+      // later via buddy_show after the personality has been set.
+      results.push([
+        flavor,
+        "",
+        `### ${rarityLabel}!`,
+        pityTriggered ? "\n*Pity system activated!*" : "",
+      ].filter(Boolean).join("\n"));
+
+      w = loadWallet();
+      results.push(`\n**Coins remaining:** ${w.coins}`);
+
+      const seed = inspirationSeed(userId);
+      results.push(buildPersonalityBlock(bones, buddyName, seed, buddySlot));
+    } else {
+      const card = renderCompanionCardMarkdown(
+        bones, buddyName, `A ${bones.rarity} ${bones.species}.`,
+      );
+      results.push([
+        flavor,
+        "",
+        `### ${rarityLabel}!`,
+        "",
+        card,
+        "\n*Discarded — the buddy vanishes into the mist.*",
+      ].filter(Boolean).join("\n"));
+
+      w = loadWallet();
+      results.push(`\n---\n**Coins remaining:** ${w.coins}`);
+      results.push(`*For the full animated experience, run \`! bun run pull\` in your terminal.*`);
+    }
+
+    checkAndAward(slot);
+
+    return { content: [{ type: "text", text: results.join("\n") }] };
   },
 );
 
@@ -897,6 +1222,9 @@ server.resource(
 );
 
 // ─── Start ──────────────────────────────────────────────────────────────────
+
+// Award session coins once per MCP server startup (= once per Claude Code session)
+if (isGachaMode()) earnCoins(5);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
