@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy backup — snapshot all claude-buddy related state
+ * code-buddy backup — snapshot all code-buddy related state
  *
  * Usage:
  *   bun run backup                 Create a new snapshot
@@ -12,11 +12,12 @@
  *
  * Backups are stored in <state-dir>/backups/YYYY-MM-DD-HHMMSS/, where
  * <state-dir> resolves via server/paths.ts ($CLAUDE_CONFIG_DIR/buddy-state
- * when that env var is set, else ~/.claude-buddy).
+ * when that env var is set, else ~/.code-buddy with a legacy fallback to
+ * ~/.claude-buddy).
  *
  * What gets backed up:
  *   - settings.json (full file)
- *   - .claude.json mcpServers["claude-buddy"] block (only our entry)
+ *   - .claude.json mcpServers["code-buddy"] block (or legacy `claude-buddy`)
  *   - skills/buddy/SKILL.md
  *   - <state-dir>/menagerie.json
  *   - <state-dir>/config.json
@@ -32,10 +33,13 @@ import {
 } from "fs";
 import { dirname, join } from "path";
 import {
+  APP_NAME,
   buddyStateDir,
   claudeSettingsPath,
   claudeSkillDir,
   claudeUserConfigPath,
+  MCP_SERVER_NAME,
+  MCP_SERVER_NAMES,
 } from "../server/path.ts";
 
 const SETTINGS = claudeSettingsPath();
@@ -68,6 +72,14 @@ function tryRead(path: string): string | null {
   try { return readFileSync(path, "utf8"); } catch { return null; }
 }
 
+function findRegisteredMcpEntry(claudeJson: Record<string, any>): any | undefined {
+  for (const name of MCP_SERVER_NAMES) {
+    const entry = claudeJson.mcpServers?.[name];
+    if (entry) return entry;
+  }
+  return undefined;
+}
+
 function listBackups(): string[] {
   if (!existsSync(BACKUPS_DIR)) return [];
   return readdirSync(BACKUPS_DIR)
@@ -95,18 +107,18 @@ function createBackup(): string {
     warn(`Skipped: ${SETTINGS} (not found)`);
   }
 
-  // 2. claude.json mcpServers["claude-buddy"]
+  // 2. claude.json mcpServers[APP_NAME] or legacy entry
   const claudeJsonRaw = tryRead(CLAUDE_JSON);
   if (claudeJsonRaw) {
     try {
       const claudeJson = JSON.parse(claudeJsonRaw);
-      const ourMcp = claudeJson.mcpServers?.["claude-buddy"];
+      const ourMcp = findRegisteredMcpEntry(claudeJson);
       if (ourMcp) {
         writeFileSync(join(dir, "mcpserver.json"), JSON.stringify(ourMcp, null, 2));
         manifest.files.push("mcpserver.json");
-        ok(`Backed up: ${CLAUDE_JSON} → mcpServers["claude-buddy"]`);
+        ok(`Backed up: ${CLAUDE_JSON} → mcpServers["${MCP_SERVER_NAME}"]`);
       } else {
-        warn(`Skipped: ${CLAUDE_JSON} mcpServers["claude-buddy"] (not registered)`);
+        warn(`Skipped: ${CLAUDE_JSON} mcpServers["${MCP_SERVER_NAME}"] (not registered)`);
       }
     } catch {
       err(`Failed to parse ${CLAUDE_JSON}`);
@@ -123,15 +135,15 @@ function createBackup(): string {
     warn(`Skipped: ${SKILL} (not found)`);
   }
 
-  // 4+. ~/.claude-buddy/ state files (don't back up the backups dir itself)
-  const stateDestDir = join(dir, "claude-buddy");
+  // 4+. state files (don't back up the backups dir itself)
+  const stateDestDir = join(dir, APP_NAME);
   mkdirSync(stateDestDir, { recursive: true });
   const stateFiles = ["menagerie.json", "config.json", "status.json", "events.json", "unlocked.json", "active_days.json"];
   for (const f of stateFiles) {
     const src = join(STATE_DIR, f);
     if (existsSync(src)) {
       copyFileSync(src, join(stateDestDir, f));
-      manifest.files.push(`claude-buddy/${f}`);
+      manifest.files.push(`${APP_NAME}/${f}`);
       ok(`Backed up: ${join(STATE_DIR, f)}`);
     }
   }
@@ -150,7 +162,7 @@ function cmdList() {
     info(`Run '${BOLD}bun run backup${NC}' to create one.`);
     return;
   }
-  console.log(`\n${BOLD}claude-buddy backups${NC}\n`);
+  console.log(`\n${BOLD}${APP_NAME} backups${NC}\n`);
   for (const ts of backups) {
     const manifestPath = join(BACKUPS_DIR, ts, "manifest.json");
     const manifest = tryRead(manifestPath);
@@ -217,12 +229,13 @@ function restoreBackup(ts: string) {
       claudeJson = JSON.parse(readFileSync(CLAUDE_JSON, "utf8"));
     } catch { /* empty */ }
     if (!claudeJson.mcpServers) claudeJson.mcpServers = {};
-    claudeJson.mcpServers["claude-buddy"] = ourMcp;
+    for (const name of MCP_SERVER_NAMES) delete claudeJson.mcpServers[name];
+    claudeJson.mcpServers[MCP_SERVER_NAME] = ourMcp;
     // Under CLAUDE_CONFIG_DIR the parent dir is not guaranteed to exist
     // if settings.json wasn't in this backup (and so step 1 was skipped).
     mkdirSync(dirname(CLAUDE_JSON), { recursive: true });
     writeFileSync(CLAUDE_JSON, JSON.stringify(claudeJson, null, 2));
-    ok(`Restored: ${CLAUDE_JSON} → mcpServers["claude-buddy"]`);
+    ok(`Restored: ${CLAUDE_JSON} → mcpServers["${MCP_SERVER_NAME}"]`);
   }
 
   // 3. SKILL.md
@@ -233,8 +246,8 @@ function restoreBackup(ts: string) {
     ok(`Restored: ${SKILL}`);
   }
 
-  // 4. ~/.claude-buddy/ state files
-  const stateDir = join(dir, "claude-buddy");
+  // 4. state files
+  const stateDir = existsSync(join(dir, APP_NAME)) ? join(dir, APP_NAME) : join(dir, "claude-buddy");
   if (existsSync(stateDir)) {
     mkdirSync(STATE_DIR, { recursive: true });
     for (const f of readdirSync(stateDir)) {
@@ -266,7 +279,7 @@ const arg = process.argv[3];
 switch (action) {
   case "create":
   case undefined: {
-    console.log(`\n${BOLD}Creating claude-buddy backup...${NC}\n`);
+    console.log(`\n${BOLD}Creating ${APP_NAME} backup...${NC}\n`);
     const ts = createBackup();
     console.log(`\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}`);
     console.log(`${GREEN}  Backup created: ${ts}${NC}`);
@@ -319,7 +332,7 @@ switch (action) {
   case "--help":
   case "-h":
     console.log(`
-${BOLD}claude-buddy backup${NC} — snapshot and restore all claude-buddy state
+${BOLD}${APP_NAME} backup${NC} — snapshot and restore all ${APP_NAME} state
 
 ${BOLD}Commands:${NC}
   bun run backup                 Create a new snapshot
@@ -331,7 +344,7 @@ ${BOLD}Commands:${NC}
 
 ${BOLD}What gets backed up:${NC}
   - ${SETTINGS}
-  - ${CLAUDE_JSON} mcpServers["claude-buddy"] (only our entry)
+  - ${CLAUDE_JSON} mcpServers["${MCP_SERVER_NAME}"] (or legacy entry)
   - ${SKILL}
   - ${STATE_DIR}/menagerie.json
   - ${STATE_DIR}/config.json

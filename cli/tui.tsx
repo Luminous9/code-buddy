@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * cli/tui.tsx — fullscreen 3-pane dashboard for claude-buddy (Ink/React)
+ * cli/tui.tsx — fullscreen 3-pane dashboard for code-buddy (Ink/React)
  *
  * Layout: persistent sidebar | content list | detail preview
  * The sidebar is always visible. Selecting a section opens the
@@ -18,11 +18,13 @@ import {
 import { execSync } from "node:child_process";
 import { join, resolve, dirname } from "node:path";
 import {
+  APP_NAME,
   buddyStateDir,
   claudeConfigDir,
   claudeSettingsPath,
   claudeSkillDir,
   claudeUserConfigPath,
+  MCP_SERVER_NAMES,
 } from "../server/path.ts";
 import {
   listCompanionSlots, loadActiveSlot, saveActiveSlot,
@@ -140,7 +142,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
     key: "backup", icon: "💾", label: "Backup",
     description: [
       "Create and browse snapshots of your",
-      "claude-buddy state — settings, hooks,",
+      "code-buddy state — settings, hooks,",
       "skill, menagerie, status, and config.",
       "",
       "Restore is currently manual (copy from",
@@ -150,7 +152,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   {
     key: "system", icon: "🚨", label: "System",
     description: [
-      "Manage claude-buddy's installation:",
+      "Manage code-buddy's installation:",
       "",
       "• Re-Enable — runs install-buddy",
       "• Disable  — keeps data, removes MCP",
@@ -168,7 +170,7 @@ function Sidebar({ cursor, section, focus }: {
   const isFocused = focus === "sidebar";
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold color="cyan">{" 🐢 claude-buddy"}</Text>
+      <Text bold color="cyan">{" 🐢 code-buddy"}</Text>
       <Text>{""}</Text>
       {SIDEBAR_ITEMS.map((item, i) => {
         const isActive = item.key === section && focus !== "sidebar";
@@ -474,7 +476,7 @@ function runDiagnostics(): DiagCategory[] {
   const mcp: DiagCheck[] = [];
   try {
     const claudeJson = JSON.parse(readFileSync(CLAUDE_JSON, "utf8"));
-    const registered = !!claudeJson?.mcpServers?.["claude-buddy"];
+    const registered = MCP_SERVER_NAMES.some(name => !!claudeJson?.mcpServers?.[name]);
     mcp.push({ label: "MCP server", value: registered ? "registered" : "NOT registered", status: registered ? "ok" : "err" });
   } catch {
     mcp.push({ label: "MCP server", value: "cannot read config", status: "err" });
@@ -612,7 +614,8 @@ function createBackup(): string {
   const claudeJsonRaw = tryRead(CLAUDE_JSON);
   if (claudeJsonRaw) {
     try {
-      const mcp = JSON.parse(claudeJsonRaw).mcpServers?.["claude-buddy"];
+      const parsed = JSON.parse(claudeJsonRaw).mcpServers ?? {};
+      const mcp = MCP_SERVER_NAMES.map(name => parsed[name]).find(Boolean);
       if (mcp) { writeFileSync(join(dir, "mcpserver.json"), JSON.stringify(mcp, null, 2)); manifest.files.push("mcpserver.json"); }
     } catch {}
   }
@@ -620,11 +623,11 @@ function createBackup(): string {
   const skillPath = SKILL_PATH;
   if (existsSync(skillPath)) { copyFileSync(skillPath, join(dir, "SKILL.md")); manifest.files.push("SKILL.md"); }
 
-  const stateDir = join(dir, "claude-buddy");
+  const stateDir = join(dir, APP_NAME);
   mkdirSync(stateDir, { recursive: true });
   for (const f of ["menagerie.json", "status.json", "config.json"]) {
     const src = join(STATE_DIR, f);
-    if (existsSync(src)) { copyFileSync(src, join(stateDir, f)); manifest.files.push(`claude-buddy/${f}`); }
+    if (existsSync(src)) { copyFileSync(src, join(stateDir, f)); manifest.files.push(`${APP_NAME}/${f}`); }
   }
 
   writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
@@ -703,7 +706,7 @@ function BackupDetailPane({ backups, cursor }: {
         <Text bold color="cyan">➕ Create Backup</Text>
         <Text>{""}</Text>
         <Text dimColor>Creates a snapshot of all</Text>
-        <Text dimColor>claude-buddy state files:</Text>
+        <Text dimColor>code-buddy state files:</Text>
         <Text>{""}</Text>
         <Text>{" "}• settings.json</Text>
         <Text>{" "}• MCP server config</Text>
@@ -865,7 +868,7 @@ function EnableDetailPane({ result, running }: {
   return (
     <Box flexDirection="column" paddingLeft={1}>
       <Text>{""}</Text>
-      <Text bold color="green">🔄 Re-Enable claude-buddy</Text>
+      <Text bold color="green">🔄 Re-Enable code-buddy</Text>
       <Text>{""}</Text>
       <Text dimColor>This will register:</Text>
       <Text>{"  "}• MCP server in {CLAUDE_JSON}</Text>
@@ -921,7 +924,7 @@ function UninstallDetailPane({ stage, typed, result, keepState }: {
   return (
     <Box flexDirection="column" paddingLeft={1}>
       <Text>{""}</Text>
-      <Text bold color="red">💥 Uninstall claude-buddy</Text>
+      <Text bold color="red">💥 Uninstall code-buddy</Text>
       <Text>{""}</Text>
       <Text color="yellow">⚠  This will remove:</Text>
       <Text>{"  "}• MCP server registration</Text>
@@ -964,7 +967,7 @@ function DisableConfirmPane({ result, confirming }: {
   return (
     <Box flexDirection="column" paddingLeft={1}>
       <Text>{""}</Text>
-      <Text bold color="red">☠ Disable claude-buddy</Text>
+      <Text bold color="red">☠ Disable code-buddy</Text>
       <Text>{""}</Text>
       <Text dimColor>This will remove:</Text>
       <Text>{"  "}• MCP server from {CLAUDE_JSON}</Text>
@@ -1000,9 +1003,15 @@ function disableBuddy(): DisableResult {
 
   try {
     const claudeJson = JSON.parse(readFileSync(CLAUDE_JSON_PATH, "utf8"));
-    if (claudeJson.mcpServers?.["claude-buddy"]) {
-      delete claudeJson.mcpServers["claude-buddy"];
-      if (Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
+    let removed = false;
+    for (const name of MCP_SERVER_NAMES) {
+      if (claudeJson.mcpServers?.[name]) {
+        delete claudeJson.mcpServers[name];
+        removed = true;
+      }
+    }
+    if (removed) {
+      if (claudeJson.mcpServers && Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
       writeFileSync(CLAUDE_JSON_PATH, JSON.stringify(claudeJson, null, 2));
       ok.push("MCP server removed");
     } else {
@@ -1026,7 +1035,8 @@ function disableBuddy(): DisableResult {
         if (settings.hooks[hookType]) {
           const before = settings.hooks[hookType].length;
           settings.hooks[hookType] = settings.hooks[hookType].filter(
-            (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+            (h: any) => !h.hooks?.some((hh: any) =>
+              hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
           );
           if (settings.hooks[hookType].length < before) changed = true;
           if (settings.hooks[hookType].length === 0) delete settings.hooks[hookType];
@@ -2215,7 +2225,7 @@ function App() {
   return (
     <Box flexDirection="column" height={rows}>
       <Box>
-        <Text color="cyan" bold>{"─ claude-buddy "}{"─".repeat(Math.max(0, cols - 17))}</Text>
+        <Text color="cyan" bold>{"─ code-buddy "}{"─".repeat(Math.max(0, cols - 15))}</Text>
       </Box>
       <Box flexGrow={1}>
         <Box width={sidebarWidth} flexDirection="column" borderStyle="single" borderColor={focus === "sidebar" ? "cyan" : "gray"}>
@@ -2247,7 +2257,7 @@ function App() {
 // ─── Entry ──────────────────────────────────────────────────────────────────
 
 if (!process.stdin.isTTY) {
-  console.error("claude-buddy tui requires an interactive terminal (TTY)");
+  console.error("code-buddy tui requires an interactive terminal (TTY)");
   process.exit(1);
 }
 

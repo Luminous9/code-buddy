@@ -29,7 +29,7 @@ import {
 describe("hashString", () => {
   test("is deterministic for the same input", () => {
     expect(hashString("hello")).toBe(hashString("hello"));
-    expect(hashString("claude-buddy")).toBe(hashString("claude-buddy"));
+    expect(hashString("code-buddy")).toBe(hashString("code-buddy"));
   });
 
   test("returns a 32-bit unsigned integer", () => {
@@ -84,7 +84,7 @@ describe("generateBones", () => {
   const SAMPLE_USER_IDS = [
     "alice",
     "bob",
-    "claude-buddy-test-user",
+    "code-buddy-test-user",
     "00000000-0000-0000-0000-000000000000",
     "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
   ];
@@ -217,7 +217,7 @@ describe("generateBones", () => {
   // stat formulas, or the salt. If one of these tests fails, stop and ask
   // "did I mean to change what every existing user's buddy looks like?"
   //
-  // The whole point of claude-buddy is that the same user always gets the
+  // The whole point of code-buddy is that the same user always gets the
   // same companion, forever. That's only true if these stay green.
 
   test("golden snapshot: 'golden-user-alpha' (common ghost)", () => {

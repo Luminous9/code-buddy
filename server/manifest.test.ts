@@ -38,7 +38,7 @@ describe("shipped plugin manifests", () => {
     const manifest = JSON.parse(
       readFileSync(join(REPO_ROOT, ".claude-plugin", "plugin.json"), "utf8"),
     );
-    const entry = manifest.mcpServers?.["claude-buddy"];
+    const entry = manifest.mcpServers?.["code-buddy"];
     expect(entry).toBeDefined();
 
     // Either the command itself is plugin-root-anchored (the launcher path),

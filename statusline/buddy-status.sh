@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-buddy status line — animated, right-aligned multi-line companion
+# code-buddy status line — animated, right-aligned multi-line companion
 #
 # Animation matches the original:
 #   - 500ms per tick, sequence: [0,0,0,0,1,0,0,0,-1,0,0,2,0,0,0]

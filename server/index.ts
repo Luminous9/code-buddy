@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy MCP server
+ * code-buddy MCP server
  *
  * Exposes the buddy companion as MCP tools + resources.
  * Runs as a stdio transport — Claude Code spawns it automatically.
@@ -48,6 +48,8 @@ import {
   isGachaMode,
 } from "./state.ts";
 import {
+  APP_NAME,
+  MCP_SERVER_NAME,
   buddyStateDir,
   claudeConfigDir,
   claudeSettingsPath,
@@ -93,7 +95,7 @@ function getInstructions(): string {
 
 const server = new McpServer(
   {
-    name: "claude-buddy",
+    name: MCP_SERVER_NAME,
     version: "0.3.0",
   },
   {
@@ -402,7 +404,7 @@ server.tool(
   {},
   async () => {
     const help = [
-      "claude-buddy commands",
+      "code-buddy commands",
       "",
       "In Claude Code:",
       "  /buddy            Show companion card with ASCII art + stats",
@@ -617,17 +619,17 @@ server.tool(
 
 server.tool(
   "buddy_uninstall",
-  "Clean up claude-buddy's writes to Claude Code's settings.json and transient session files in the buddy state dir (resolved via CLAUDE_CONFIG_DIR), in preparation for `claude plugin uninstall`. Companion data (menagerie, status, config) is intentionally preserved so reinstalling restores the buddy. The tool only cleans the plugin's own settings — it never removes a foreign statusLine.",
+  "Clean up code-buddy's writes to Claude Code's settings.json and transient session files in the buddy state dir (resolved via CLAUDE_CONFIG_DIR), in preparation for `claude plugin uninstall`. Companion data (menagerie, status, config) is intentionally preserved so reinstalling restores the buddy. The tool only cleans the plugin's own settings — it never removes a foreign statusLine.",
   {},
   async () => {
     const result = cleanupPluginState();
 
     const settingsPath = claudeSettingsPath();
     const stateDir = buddyStateDir();
-    const pluginsCacheDir = join(claudeConfigDir(), "plugins", "cache", "claude-buddy");
+    const pluginsCacheDir = join(claudeConfigDir(), "plugins", "cache", APP_NAME);
 
     const lines: string[] = [];
-    lines.push("claude-buddy: settings.json cleanup complete.");
+    lines.push(`${APP_NAME}: settings.json cleanup complete.`);
     lines.push("");
     lines.push(
       result.statusLineRemoved
@@ -646,8 +648,8 @@ server.tool(
     lines.push("");
     lines.push("Now run these commands via the Bash tool, in order:");
     lines.push("");
-    lines.push("  claude plugin uninstall claude-buddy@claude-buddy");
-    lines.push("  claude plugin marketplace remove claude-buddy");
+    lines.push("  claude plugin uninstall code-buddy@code-buddy");
+    lines.push("  claude plugin marketplace remove code-buddy");
     lines.push(`  rm -rf ${pluginsCacheDir}`);
     lines.push("");
     lines.push(

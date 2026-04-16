@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy disable — temporarily deactivate buddy without losing data
+ * code-buddy disable — temporarily deactivate buddy without losing data
  *
  * Removes: MCP server, status line, hooks
  * Keeps: companion data, backups, skill files
@@ -10,9 +10,11 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import {
+  APP_NAME,
   buddyStateDir,
   claudeSettingsPath,
   claudeUserConfigPath,
+  MCP_SERVER_NAMES,
 } from "../server/path.ts";
 
 const GREEN = "\x1b[32m";
@@ -28,14 +30,20 @@ const CLAUDE_JSON = claudeUserConfigPath();
 const SETTINGS = claudeSettingsPath();
 const STATE_DIR = buddyStateDir();
 
-console.log(`\n${BOLD}Disabling claude-buddy...${NC}\n`);
+console.log(`\n${BOLD}Disabling ${APP_NAME}...${NC}\n`);
 
 // 1. Remove MCP server from ~/.claude.json
 try {
   const claudeJson = JSON.parse(readFileSync(CLAUDE_JSON, "utf8"));
-  if (claudeJson.mcpServers?.["claude-buddy"]) {
-    delete claudeJson.mcpServers["claude-buddy"];
-    if (Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
+  let removed = false;
+  for (const name of MCP_SERVER_NAMES) {
+    if (claudeJson.mcpServers?.[name]) {
+      delete claudeJson.mcpServers[name];
+      removed = true;
+    }
+  }
+  if (removed) {
+    if (claudeJson.mcpServers && Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
     writeFileSync(CLAUDE_JSON, JSON.stringify(claudeJson, null, 2));
     ok(`MCP server removed from ${CLAUDE_JSON}`);
   } else {
@@ -61,7 +69,8 @@ try {
       if (settings.hooks[hookType]) {
         const before = settings.hooks[hookType].length;
         settings.hooks[hookType] = settings.hooks[hookType].filter(
-          (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+          (h: any) => !h.hooks?.some((hh: any) =>
+            hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
         );
         if (settings.hooks[hookType].length < before) changed = true;
         if (settings.hooks[hookType].length === 0) delete settings.hooks[hookType];
@@ -88,7 +97,7 @@ try {
 
 console.log(`
 ${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}
-${GREEN}  Buddy disabled.${NC}
+${GREEN}  ${APP_NAME} disabled.${NC}
 ${GREEN}  Companion data is preserved at ${STATE_DIR}${NC}
 ${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}
 

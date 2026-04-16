@@ -16,7 +16,7 @@ const value = args[1];
 if (!key) {
   const cfg = loadConfig();
   console.log(`
-  claude-buddy settings
+  code-buddy settings
   ─────────────────────
   Host type:         ${cfg.hostType}    (default host for buddy integrations and soul generation)
   Comment cooldown:  ${cfg.commentCooldown}s    (0 = no throttling, default 30)

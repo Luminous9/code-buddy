@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-buddy MCP server launcher — preflight checks bun, then execs the server.
+# code-buddy MCP server launcher — preflight checks bun, then execs the server.
 # Failing here with a clear stderr message is much easier to debug than a silent
 # "MCP tools not available" from Claude Code.
 
@@ -7,9 +7,9 @@ set -eu
 
 if ! command -v bun >/dev/null 2>&1; then
   cat >&2 <<'EOF'
-[claude-buddy] ERROR: 'bun' was not found on PATH.
+[code-buddy] ERROR: 'bun' was not found on PATH.
 
-claude-buddy's MCP server runs on bun. Install it with:
+code-buddy's MCP server runs on bun. Install it with:
 
     curl -fsSL https://bun.sh/install | bash
 

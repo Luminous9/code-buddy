@@ -4,13 +4,20 @@
 //   1. Path normalization (Windows compat) — toUnixPath().
 //   2. Resolution of Claude Code config / state paths — claudeConfigDir,
 //      claudeSettingsPath, claudeSkillDir, claudeUserConfigPath, buddyStateDir.
-//      These honor CLAUDE_CONFIG_DIR so claude-buddy works with Claude Code's
+//      These honor CLAUDE_CONFIG_DIR so code-buddy works with Claude Code's
 //      multi-account layout (one CLAUDE_CONFIG_DIR per profile).
 //
 // The shell counterpart of (2) lives in scripts/paths.sh and MUST stay in sync.
 
+import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+
+export const APP_NAME = "code-buddy";
+export const LEGACY_APP_NAME = "claude-buddy";
+export const MCP_SERVER_NAME = "code-buddy";
+export const LEGACY_MCP_SERVER_NAME = "claude-buddy";
+export const MCP_SERVER_NAMES = [MCP_SERVER_NAME, LEGACY_MCP_SERVER_NAME] as const;
 
 // ─── (1) Path normalization ─────────────────────────────────────────────────
 
@@ -36,15 +43,20 @@ export function toUnixPath(p: string): string {
 //     when present, falling back to $HOME/.claude.json for setups that
 //     keep it at $HOME. Buddy state goes to $CLAUDE_CONFIG_DIR/buddy-state.
 //   - If CLAUDE_CONFIG_DIR is NOT set: the single-profile defaults —
-//     ~/.claude/, ~/.claude.json, ~/.claude-buddy/.
+//     ~/.claude/, ~/.claude.json, ~/.code-buddy/ (with legacy fallback to
+//     ~/.claude-buddy/ when migrating an existing install).
 
 function envDir(name: string): string | undefined {
   const v = process.env[name];
   return v && v.length > 0 ? v : undefined;
 }
 
+function homeDir(): string {
+  return envDir("HOME") ?? homedir();
+}
+
 export function claudeConfigDir(): string {
-  return envDir("CLAUDE_CONFIG_DIR") ?? join(homedir(), ".claude");
+  return envDir("CLAUDE_CONFIG_DIR") ?? join(homeDir(), ".claude");
 }
 
 export function claudeSettingsPath(): string {
@@ -72,11 +84,13 @@ export function claudeSkillDir(name: string): string {
 export function claudeUserConfigPath(): string {
   const cfgDir = envDir("CLAUDE_CONFIG_DIR");
   if (cfgDir) return join(cfgDir, ".claude.json");
-  return join(homedir(), ".claude.json");
+  return join(homeDir(), ".claude.json");
 }
 
 export function buddyStateDir(): string {
   const cfgDir = envDir("CLAUDE_CONFIG_DIR");
   if (cfgDir) return join(cfgDir, "buddy-state");
-  return join(homedir(), ".claude-buddy");
+  const current = join(homeDir(), ".code-buddy");
+  const legacy = join(homeDir(), ".claude-buddy");
+  return existsSync(current) || !existsSync(legacy) ? current : legacy;
 }

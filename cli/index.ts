@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy CLI
+ * code-buddy CLI
  *
  * Usage:
- *   npx claude-buddy              Interactive install
- *   npx claude-buddy install      Install MCP + skill + hooks + statusline
- *   npx claude-buddy show         Show current buddy
- *   npx claude-buddy pick         Interactive two-pane buddy picker (saved + search)
- *   npx claude-buddy hunt         Search for a specific buddy (non-interactive)
- *   npx claude-buddy upgrade     Pull latest + reinstall
- *   npx claude-buddy uninstall    Remove all integrations
- *   npx claude-buddy verify       Verify what buddy your ID produces
+ *   npx code-buddy              Interactive install
+ *   npx code-buddy install      Install MCP + skill + hooks + statusline
+ *   npx code-buddy show         Show current buddy
+ *   npx code-buddy pick         Interactive two-pane buddy picker (saved + search)
+ *   npx code-buddy hunt         Search for a specific buddy (non-interactive)
+ *   npx code-buddy upgrade      Pull latest + reinstall
+ *   npx code-buddy uninstall    Remove all integrations
+ *   npx code-buddy verify       Verify what buddy your ID produces
  */
 
 const args = process.argv.slice(2);
@@ -72,14 +72,14 @@ switch (command) {
 
 function showHelp() {
   console.log(`
-claude-buddy — permanent coding companion for Claude Code
+code-buddy — permanent coding companion for Claude Code
 
 Setup:
   install-buddy     Set up MCP server, skill, hooks, and status line
   upgrade           Pull latest version and reinstall integrations
   enable            Same as install-buddy (re-enable after disable)
   disable           Temporarily deactivate buddy (data preserved)
-  uninstall         Remove all claude-buddy integrations
+  uninstall         Remove all code-buddy integrations
 
 Buddy:
   show              Display your current buddy
@@ -100,7 +100,7 @@ Settings:
 Diagnostics:
   doctor            Run diagnostic report (paste output in bug reports)
   test-statusline   Test status line rendering in Claude Code
-  backup            Snapshot or restore all claude-buddy state
+  backup            Snapshot or restore all code-buddy state
 
 In Claude Code:
   /buddy            Show companion card with ASCII art + stats
@@ -124,7 +124,7 @@ In Claude Code:
 
 Usage:
   bun run <command>           e.g. bun run show, bun run doctor
-  claude-buddy <command>      if globally linked (bun link)
+  code-buddy <command>        if globally linked (bun link)
   bun run help                Show this help
 `);
 }

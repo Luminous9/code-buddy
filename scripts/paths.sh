@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Path resolvers for claude-buddy shell scripts.
+# Path resolvers for code-buddy shell scripts.
 #
 # Must stay in sync with server/path.ts. Source this file early:
 #   source "$(dirname "$0")/../scripts/paths.sh"
@@ -11,7 +11,7 @@
 #     (settings.json, skills/, .claude.json inside the config dir, and
 #      buddy state at $CLAUDE_CONFIG_DIR/buddy-state).
 #   - Else (single-profile default) → $HOME/.claude, $HOME/.claude.json,
-#     $HOME/.claude-buddy.
+#     $HOME/.code-buddy, with legacy fallback to $HOME/.claude-buddy.
 
 if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
   CLAUDE_CFG_DIR="$CLAUDE_CONFIG_DIR"
@@ -33,6 +33,8 @@ fi
 
 if [[ -n "${CLAUDE_CONFIG_DIR:-}" ]]; then
   BUDDY_STATE_DIR="$CLAUDE_CONFIG_DIR/buddy-state"
+elif [[ -d "$HOME/.code-buddy" || ! -d "$HOME/.claude-buddy" ]]; then
+  BUDDY_STATE_DIR="$HOME/.code-buddy"
 else
   BUDDY_STATE_DIR="$HOME/.claude-buddy"
 fi

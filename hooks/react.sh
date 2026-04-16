@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-buddy PostToolUse hook
+# code-buddy PostToolUse hook
 # Detects events in Bash tool output and writes a reaction to the status line.
 #
 # Combined: PR #4 species reactions + TTY session isolation + PR #13 field fix
