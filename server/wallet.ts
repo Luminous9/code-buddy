@@ -4,15 +4,15 @@
  * Users earn coins through normal coding activity (turns, errors, tests, diffs,
  * sessions, active days, pets). Coins are spent on gacha pulls to collect buddies.
  *
- * Persistence: ~/.claude-buddy/wallet.json (atomic tmp+rename writes).
+ * Persistence: <buddy-state>/wallet.json (atomic tmp+rename writes).
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { buddyStateDir } from "./path.ts";
 import { isGachaMode } from "./state.ts";
 
-const STATE_DIR = join(homedir(), ".claude-buddy");
+const STATE_DIR = buddyStateDir();
 const WALLET_FILE = join(STATE_DIR, "wallet.json");
 
 export const PULL_COST = 50;
@@ -59,6 +59,12 @@ export function loadWallet(): WalletState {
 
 export function saveWallet(wallet: WalletState): void {
   atomicWrite(WALLET_FILE, JSON.stringify(wallet, null, 2));
+}
+
+export function initializeWallet(): WalletState {
+  const wallet = loadWallet();
+  saveWallet(wallet);
+  return wallet;
 }
 
 export function earnCoins(amount: number): WalletState {

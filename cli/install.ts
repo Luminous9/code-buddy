@@ -21,6 +21,7 @@ import {
 } from "../server/path.ts";
 import { loadCompanion, saveCompanion, resolveUserId, writeStatusState } from "../server/state.ts";
 import { generateFallbackName } from "../server/reactions.ts";
+import { initializeWallet } from "../server/wallet.ts";
 
 const CYAN = "\x1b[36m";
 const GREEN = "\x1b[32m";
@@ -261,6 +262,11 @@ function initCompanion() {
   return companion;
 }
 
+function initWallet() {
+  initializeWallet();
+  ok("Wallet initialized");
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 banner();
@@ -298,6 +304,7 @@ try {
 
 console.log("");
 const companion = initCompanion();
+initWallet();
 
 console.log("");
 console.log(renderBuddy(companion.bones));
