@@ -1,7 +1,8 @@
 /**
  * Unit tests for the pure string helpers in state.ts.
  *
- * The rest of state.ts is file I/O against ~/.claude-buddy/ and is not
+ * The rest of state.ts is file I/O against the on-disk buddy state path and
+ * is not
  * covered here — those integration-style cases belong in a separate suite
  * with a proper temp directory. slugify() is a pure function though, so
  * it's easy to pin down.

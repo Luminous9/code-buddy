@@ -1,5 +1,5 @@
 /**
- * claude-buddy installer
+ * code-buddy installer
  *
  * Registers: MCP server (in Claude's user config), skill, hooks, status line
  * (in settings.json). All paths resolve via server/paths.ts, so the installer
@@ -13,10 +13,13 @@ import { resolve, dirname, join } from "path";
 
 import { generateBones, renderBuddy, renderFace, RARITY_STARS } from "../server/engine.ts";
 import {
+  APP_NAME,
   claudeConfigDir,
   claudeSettingsPath,
   claudeSkillDir,
   claudeUserConfigPath,
+  MCP_SERVER_NAME,
+  MCP_SERVER_NAMES,
   toUnixPath,
 } from "../server/path.ts";
 import { loadCompanion, saveCompanion, resolveUserId, writeStatusState } from "../server/state.ts";
@@ -40,7 +43,7 @@ const PROJECT_ROOT = resolve(dirname(import.meta.dir));
 function banner() {
   console.log(`
 ${CYAN}╔══════════════════════════════════════════════════════════╗${NC}
-${CYAN}║${NC}  ${BOLD}claude-buddy${NC} — permanent coding companion              ${CYAN}║${NC}
+${CYAN}║${NC}  ${BOLD}code-buddy${NC} — permanent coding companion                ${CYAN}║${NC}
 ${CYAN}║${NC}  ${DIM}MCP + Skill + StatusLine + Hooks${NC}                        ${CYAN}║${NC}
 ${CYAN}╚══════════════════════════════════════════════════════════╝${NC}
 `);
@@ -126,7 +129,11 @@ function installMcp() {
 
   if (!claudeJson.mcpServers) claudeJson.mcpServers = {};
 
-  claudeJson.mcpServers["claude-buddy"] = {
+  for (const name of MCP_SERVER_NAMES) {
+    if (name !== MCP_SERVER_NAME) delete claudeJson.mcpServers[name];
+  }
+
+  claudeJson.mcpServers[MCP_SERVER_NAME] = {
     command: "bun",
     args: [toUnixPath(serverPath)],
     cwd: toUnixPath(PROJECT_ROOT),
@@ -172,7 +179,9 @@ function stripLegacyPopupHooks(settings: Record<string, any>) {
     if (!settings.hooks[hookType]) continue;
     settings.hooks[hookType] = settings.hooks[hookType].filter(
       (h: any) => !h.hooks?.some((hh: any) =>
-        hh.command?.includes("popup-manager") || hh.command?.includes("claude-buddy/popup"),
+        hh.command?.includes("popup-manager") ||
+        hh.command?.includes("code-buddy/popup") ||
+        hh.command?.includes("claude-buddy/popup"),
       ),
     );
     if (settings.hooks[hookType].length === 0) delete settings.hooks[hookType];
@@ -191,7 +200,8 @@ function installHooks(settings: Record<string, any>) {
   // PostToolUse: detect errors/test failures/successes in Bash output
   if (!settings.hooks.PostToolUse) settings.hooks.PostToolUse = [];
   settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter(
-    (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+    (h: any) => !h.hooks?.some((hh: any) =>
+      hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
   );
   settings.hooks.PostToolUse.push({
     matcher: "Bash",
@@ -201,7 +211,8 @@ function installHooks(settings: Record<string, any>) {
   // Stop: extract <!-- buddy: --> comment from Claude's response
   if (!settings.hooks.Stop) settings.hooks.Stop = [];
   settings.hooks.Stop = settings.hooks.Stop.filter(
-    (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+    (h: any) => !h.hooks?.some((hh: any) =>
+      hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
   );
   settings.hooks.Stop.push({
     hooks: [{ type: "command", command: toUnixPath(commentHook) }],
@@ -210,7 +221,8 @@ function installHooks(settings: Record<string, any>) {
   // UserPromptSubmit: detect buddy's name in user message → instant status line reaction
   if (!settings.hooks.UserPromptSubmit) settings.hooks.UserPromptSubmit = [];
   settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit.filter(
-    (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+    (h: any) => !h.hooks?.some((hh: any) =>
+      hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
   );
   settings.hooks.UserPromptSubmit.push({
     hooks: [{ type: "command", command: toUnixPath(nameHook) }],
@@ -283,7 +295,7 @@ if (!preflight()) {
 }
 
 console.log("");
-info("Installing claude-buddy...\n");
+info(`Installing ${APP_NAME}...\n`);
 
 const settings = loadSettings();
 

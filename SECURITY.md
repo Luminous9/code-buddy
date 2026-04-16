@@ -2,10 +2,10 @@
 
 ## Scope
 
-claude-buddy runs locally on your machine. It consists of:
+code-buddy runs locally on your machine. It consists of:
 - An MCP server (stdio, local only — no network listeners)
 - Shell scripts for status line and hooks
-- State files in `~/.claude-buddy/`
+- State files in `~/.code-buddy/` or legacy `~/.claude-buddy/`
 
 It does **not** make external network requests, collect telemetry, or transmit any data.
 
@@ -21,7 +21,7 @@ I'll respond within 48 hours and work with you on a fix before any public disclo
 
 - Shell injection risks in hooks or status line scripts
 - File permission issues with state files
-- Anything that could leak data from `~/.claude.json` or `~/.claude-buddy/`
+- Anything that could leak data from `~/.claude.json` or `~/.code-buddy/`
 
 ## What's Not in Scope
 

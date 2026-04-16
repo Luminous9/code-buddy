@@ -1,7 +1,7 @@
 {
-    "name": "claude-buddy",
+    "name": "code-buddy",
     "owner": {
-        "name": "1270011"
+        "name": "Luminous9"
     },
     "metadata": {
         "description": "Permanent coding companion for Claude Code (requires bun: https://bun.sh/install)",
@@ -9,15 +9,15 @@
     },
     "plugins": [
         {
-            "name": "claude-buddy",
+            "name": "code-buddy",
             "source": "./",
             "description": "Permanent coding companion for Claude Code \u2014 survives any update. MCP-based terminal pet with ASCII art, stats, reactions, and personality. Requires bun runtime (https://bun.sh/install).",
             "version": "0.3.0",
             "author": {
-                "name": "1270011"
+                "name": "Luminous9"
             },
-            "homepage": "https://github.com/1270011/claude-buddy#readme",
-            "repository": "https://github.com/1270011/claude-buddy",
+            "homepage": "https://github.com/Luminous9/code-buddy#readme",
+            "repository": "https://github.com/Luminous9/code-buddy",
             "license": "MIT",
             "keywords": [
                 "claude-code",

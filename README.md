@@ -1,130 +1,144 @@
 <div align="center">
 
-<!-- ============================================================ -->
-<!-- LOGO / HERO                                                  -->
-<!-- Later replace with: docs/logo.png                            -->
-<!-- ============================================================ -->
-<img src="https://placehold.co/120x120/6366f1/ffffff?text=%F0%9F%A6%89" alt="claude-buddy logo" width="120" />
+<img src="https://placehold.co/120x120/6366f1/ffffff?text=%F0%9F%A6%89" alt="code-buddy logo" width="120" />
 
-# Claude Code Buddy
+# Code Buddy
 
-### Your Claude Code buddy — permanently. Survives every update.
+### Luminous9's fork of `claude-buddy` with a new `code-buddy` identity and a more collectible, customizable terminal companion
 
-<!-- ============================================================ -->
-<!-- BADGES                                                        -->
-<!-- ============================================================ -->
-
-[![Version](https://img.shields.io/github/v/release/1270011/claude-buddy?style=flat-square&color=6366f1)](https://github.com/1270011/claude-buddy/releases)
-[![License](https://img.shields.io/github/license/1270011/claude-buddy?style=flat-square&color=10b981)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/1270011/claude-buddy?style=flat-square&color=f59e0b)](https://github.com/1270011/claude-buddy/stargazers)
+[![License](https://img.shields.io/github/license/Luminous9/code-buddy?style=flat-square&color=10b981)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Luminous9/code-buddy?style=flat-square&color=f59e0b)](https://github.com/Luminous9/code-buddy/stargazers)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-v2.1.80%2B-8b5cf6?style=flat-square)](https://claude.ai/code)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macOS-blue?style=flat-square)](#requirements)
 [![MCP](https://img.shields.io/badge/powered%20by-MCP-ec4899?style=flat-square)](https://modelcontextprotocol.io)
 
-<!-- ============================================================ -->
-<!-- HERO GIF — the most important asset                          -->
-<!-- ============================================================ -->
-
 <br>
 
-<img src="docs/hero.gif" alt="claude-buddy in action" width="800" />
+<img src="docs/hero.gif" alt="code-buddy in action" width="800" />
 
 <br><br>
 
-> **Anthropic removed `/buddy` in Claude Code v2.1.97.** This brings it back — *forever*. Same species, same stats, same personality. Now powered by MCP, so no update can ever take it away again.
-
-<br>
-
-<!-- ============================================================ -->
-<!-- FEATURE HIGHLIGHTS — 4-column grid, no borders               -->
-<!-- ============================================================ -->
-
-<table>
-<tr>
-<td align="center" width="25%">
-<h3>🛡️</h3>
-<b>Survives Updates</b><br>
-<sub>MCP-based, not binary-patched. Your buddy lives through every Claude Code release.</sub>
-</td>
-<td align="center" width="25%">
-<h3>🎨</h3>
-<b>18 Species</b><br>
-<sub>From ducks to dragons — each with animated ASCII art and rarity colors.</sub>
-</td>
-<td align="center" width="25%">
-<h3>💬</h3>
-<b>Speech Bubbles</b><br>
-<sub>Your buddy comments on your code in real time. Invisible, contextual, alive.</sub>
-</td>
-<td align="center" width="25%">
-<h3>⚡</h3>
-<b>One-Command Install</b><br>
-<sub>Zero config. Works on any Claude Code v2.1.80+. Uninstall anytime.</sub>
-</td>
-</tr>
-</table>
-
-<br>
+> This project started as a fork of [1270011/claude-buddy](https://github.com/1270011/claude-buddy), which restored the removed Claude Code buddy and added new features like the multi-buddy menagerie. This fork keeps that goal, but pushes it further with a gacha-style collection system (optional), new species, LLM-generated buddy souls, better session isolation, and the first pieces of future multi-host support for similar tools like Codex CLI.
 
 </div>
 
-<!-- ============================================================ -->
-<!-- QUICK START                                                  -->
-<!-- ============================================================ -->
+## What This Fork Is
 
-## 📋 Requirements
+This repo is still Claude Code-first today. It installs the same core MCP server, `/buddy` skill, hooks, and status line integrations that make the original buddy system work inside Claude Code.
 
-- **[bun](https://bun.sh/install)** on `PATH` — claude-buddy's MCP server runs on bun. Install once: `curl -fsSL https://bun.sh/install | bash`
-- **Claude Code v2.1.80+**
-- **Linux or macOS** (Windows is experimental)
+The difference is that this fork treats the buddy system more like an evolving companion game:
 
-## 🚀 Quick Start
+- Your original account buddy is still deterministic and stable.
+- You can now collect additional buddies through a coin-based gacha system. (Note: you can turn this off and use the hunt/search tools to get whatever buddy you want still)
+- Species are organized into packs, so new themed groups can be added without rewriting the whole engine.
+- Pulled buddies can get LLM-generated names and personalities instead of relying only on static templates.
+- The project now has an initial `hostType` setting so future Claude Code and Codex support can share the same core state/config.
+
+## Highlights
+
+- Adds a full gacha mode with coins earned through using Claude Code, pity counters, pull animations, wallet tracking, and achievements.
+- Uses pack-based species data, with new themed packs and species planned to be added (so far have added spider and beetle to the new Insects pack).
+- Adds early Codex integration work for soul generation, so it can work even if you don't have Claude Code.
+
+## Requirements
+
+- [bun](https://bun.sh/install) on `PATH`
+- Claude Code v2.1.80+ for the full in-editor integration
+- Linux or macOS
+- `jq` on `PATH`
+
+Codex support in this fork is still partial. Right now, the main installed experience isfor Claude Code.
+
+## Quick Start
 
 ```bash
-git clone https://github.com/1270011/claude-buddy
-cd claude-buddy
+git clone https://github.com/Luminous9/code-buddy
+cd code-buddy
 bun install
 bun run install-buddy
 ```
 
-Then restart Claude Code and type `/buddy`. That's it.
+Then restart Claude Code and type `/buddy`.
 
-<sub>💡 Want a global `claude-buddy` command? → `bun link`</sub>
-<br>
-<sub>💡 Need help? → `bun run help` or `claude-buddy help` (if linked) in terminal · `/buddy help` in Claude Code</sub>
+Optional next steps:
+
+```bash
+bun run settings gacha on
+```
+
+Notes:
+
+- The repo and optional global CLI command are both now `code-buddy`.
+- `host codex` currently affects the default soul-generation provider and is an early step toward broader Codex support, not a full native Codex port yet.
 
 ### Multiple Claude profiles?
 
-If you run Claude Code with `CLAUDE_CONFIG_DIR` set (e.g. separate work and personal accounts), pass the same env var to install so buddy lands in the active profile and gets its own menagerie:
+If you run Claude Code with `CLAUDE_CONFIG_DIR` set, use the same env var when installing so buddy lands in the matching profile:
 
 ```bash
 CLAUDE_CONFIG_DIR=~/.claude-personal bun run install-buddy
 CLAUDE_CONFIG_DIR=~/.claude-personal bun run uninstall
 ```
 
-The installer prints `Target profile: <path>` at the top so you can see at a glance which profile you're targeting. Each profile gets its own MCP entry, skill, hooks, status line, and `$CLAUDE_CONFIG_DIR/buddy-state/` menagerie — installs in one profile don't touch another. With `CLAUDE_CONFIG_DIR` unset, behaviour is identical to single-profile (`~/.claude/`, `~/.claude-buddy/`).
-
-<br>
+Each profile gets its own MCP entry, skill, hooks, status line config, and `buddy-state` directory.
 
 ---
 
-<!-- ============================================================ -->
-<!-- COLLAPSIBLE SECTIONS START HERE                              -->
-<!-- ============================================================ -->
-
 <details>
-<summary><b>🐙 &nbsp; Meet the 18 Species</b></summary>
+<summary><b>🎰 &nbsp; Gacha System</b></summary>
 
 <br>
 
-Every buddy is uniquely generated from your Claude Code account — same species, same stats, same personality every time. 18 species, each with 3 idle animation frames + a blink.
+This fork adds an optional gacha mode for collecting buddies beyond your original deterministic account buddy.
 
-<!-- Later replace with: docs/species-grid.png -->
-<p align="center">
-<img src="https://placehold.co/800x500/1e1e2e/cdd6f4?text=%F0%9F%90%99+SPECIES+GRID+IMAGE+%F0%9F%90%99%0A%2818+species+in+a+visual+grid%29" alt="all 18 species" width="800" />
-</p>
+### How it works
 
-```
+- Turn gacha mode on with `bun run settings gacha on` or `/buddy gacha on`.
+- Earn coins through normal use: turns, errors, test failures, large diffs, sessions, active days, and pets.
+- Spend `50` coins per pull to hatch a random buddy.
+- While gacha mode is on, free hunt/pick acquisition is disabled and pulls become the main way to obtain new buddies.
+- Every pull updates pity counters:
+    - `50` pulls without an epic or better guarantees epic+
+    - `100` pulls without a legendary guarantees legendary
+- Pulled buddies can be kept in your menagerie and summoned later.
+
+### Commands
+
+In Claude Code:
+
+- `/buddy pull`
+- `/buddy wallet`
+- `/buddy gacha on`
+- `/buddy gacha off`
+- `/buddy packs`
+
+In the terminal:
+
+- `bun run pull`
+- `bun run settings gacha on`
+- `bun run settings gacha off`
+- `bun run settings`
+
+</details>
+
+---
+
+<details>
+<summary><b>🧬 &nbsp; Species, Packs, and Rotation</b></summary>
+
+<br>
+
+The original buddy is still generated deterministically from your account identity. Gacha pulls are different: they generate new buddies from the active pack pool.
+
+### Core Pack
+
+The original `core` pack is always available and contains the 18 classic species:
+
+`duck`, `goose`, `blob`, `cat`, `dragon`, `octopus`, `owl`, `penguin`, `turtle`, `snail`, `ghost`, `axolotl`, `capybara`, `cactus`, `robot`, `rabbit`, `mushroom`, `chonk`
+
+These are still previewed here because they are the familiar baseline species from the original Claude Code buddy feature:
+
+```text
  duck        goose       blob        cat         dragon      octopus
    __         (°>        .----.       /\_/\      /^\  /^\     .----.
  <(° )___      ||       ( °  ° )    ( °   °)   <  °  °  >   ( °  ° )
@@ -144,23 +158,66 @@ Every buddy is uniquely generated from your Claude Code account — same species
  `------'     |    |      `------'   (")__(")      |____|    `------'
 ```
 
-### Rarities
+### Additional Packs
 
-| Rarity | Chance | Stars | Color |
-|:---|:---:|:---:|:---|
-| Common | 60% | ★ | Gray |
-| Uncommon | 25% | ★★ | Green |
-| Rare | 10% | ★★★ | Blue |
-| Epic | 4% | ★★★★ | Purple |
-| Legendary | 1% | ★★★★★ | Gold |
+This fork introduces a pack system so new species can ship as themed expansions.
 
-Colors use **24-bit true color** matching Claude Code's dark theme exactly.
+Current additional pack:
 
-### Stats
+- `insects`
+    - `spider`
+    - `beetle`
 
-Every buddy has **5 core stats**: `DEBUGGING` · `PATIENCE` · `CHAOS` · `WISDOM` · `SNARK`
+To preserve some discovery, this README does not spoil the full ASCII art for expansion-pack species.
 
-High SNARK buddies are sarcastic. High WISDOM ones are insightful. High CHAOS ones are unpredictable. Each buddy has a peak stat and a dump stat.
+### Rotation
+
+- `core` is always available.
+- Non-core packs are designed to rotate as featured pull pools.
+- At the moment there is one released non-core pack, so the current extra runtime pack is `insects`.
+
+### Rarity and Stats
+
+Every buddy still has:
+
+- a rarity: `common`, `uncommon`, `rare`, `epic`, `legendary`
+- five core stats: `DEBUGGING`, `PATIENCE`, `CHAOS`, `WISDOM`, `SNARK`
+
+Pulled buddies also get generated souls, so two buddies can feel much more distinct even when they share a species or rarity.
+
+</details>
+
+---
+
+<details>
+<summary><b>💬 &nbsp; Souls and Personality Generation</b></summary>
+
+<br>
+
+One of the larger changes in this fork is that pulled buddies can get an LLM-generated soul:
+
+- a generated name
+- a short personality description
+- tone grounded in the buddy's stat profile rather than a generic template
+
+By default this follows the configured host:
+
+```bash
+bun run settings host claude
+bun run settings host codex
+```
+
+You can also override it per pull:
+
+```bash
+bun run pull -- --llm claude
+bun run pull -- --llm codex
+```
+
+Current state of host support:
+
+- `claude`: supported
+- `codex`: only supported for pull soul generation
 
 </details>
 
@@ -171,51 +228,32 @@ High SNARK buddies are sarcastic. High WISDOM ones are insightful. High CHAOS on
 
 <br>
 
-Five integration points, zero binary dependencies. When Claude Code updates, your buddy stays.
+The installed runtime is still built around stable Claude Code extension points:
 
-```
-┌────────────── Claude Code (any version) ──────────────┐
-│                                                        │
-│   MCP Server    Skill       Status Line    Hooks       │
-│  (buddy tools) (/buddy)    (animated art) (comments)   │
-└───────────────────────┬────────────────────────────────┘
-                        │ stable extension points
-             ┌──────────┴──────────┐
-             │    claude-buddy     │
-             │                     │
-             │  wyhash + mulberry32│
-             │  18 species, 3 anim │
-             │  rarity colors      │
-             │  speech bubbles     │
-             │  ~/.claude-buddy/   │
-             └─────────────────────┘
-```
+- MCP server
+- `/buddy` skill
+- status line integration
+- post-tool and stop hooks
 
-- **MCP Server** — companion tools + system prompt that instructs Claude to write buddy comments
-- **Skill** — routes `/buddy`, `/buddy pet`, `/buddy stats`, `/buddy off`, `/buddy rename`
-- **Status Line** — animated ASCII art, right-aligned, with rarity color and speech bubble
-- **PostToolUse Hook** — detects errors, test failures, large diffs in Bash output
-- **Stop Hook** — extracts invisible `<!-- buddy: ... -->` comments from Claude's responses
+This fork also refactors the buddy internals so the system is easier to extend:
 
-### Why MCP Instead of Binary Patching?
+- pack-based species registry
+- centralized hat rendering
+- wallet and gacha state
+- menagerie storage
+- reaction/session isolation
+- host-aware config
 
-| Approach | Survives Updates | Animated | Comments | Risk |
-|---|:---:|:---:|:---:|---|
-| Binary patching | ❌ | ❌ | ❌ | Breaks on update |
-| Pin old version | ❌ | ✅ | ✅ | No security fixes |
-| **claude-buddy** | **✅** | **✅** | **✅** | **None** |
+### Repository layout
 
-MCP is an industry-standard protocol. Skills are Markdown files. Hooks and status line are shell scripts. Nothing depends on Claude Code's binary internals.
-
-### Repository Layout
-
-```
-claude-buddy/
-├── server/          # MCP server — tools, engine, art, reactions, state
-├── skills/buddy/    # /buddy slash command
-├── hooks/           # PostToolUse + Stop hooks (error & comment detection)
-├── statusline/      # Animated right-aligned buddy display
-└── cli/             # install, show, hunt, verify, doctor, backup, uninstall
+```text
+code-buddy/
+├── server/          # MCP tools, engine, packs, reactions, wallet, state
+├── cli/             # install, show, pick, pull, doctor, backup, settings
+├── hooks/           # reaction + comment extraction hooks
+├── statusline/      # buddy display for Claude Code
+├── skills/buddy/    # /buddy slash-command routing
+└── scripts/         # species tooling and generation helpers
 ```
 
 </details>
@@ -229,202 +267,119 @@ claude-buddy/
 
 ### In Claude Code
 
-| Command | Description |
-|---|---|
-| `/buddy` | Show companion card with ASCII art and stats |
-| `/buddy pet` | Pet your companion |
-| `/buddy stats` | Stats-only card |
-| `/buddy off` / `on` | Mute / unmute reactions |
-| `/buddy rename <name>` | Rename (1–14 chars) |
-| `/buddy personality <text>` | Set custom personality |
-| `/buddy summon [slot]` | Summon a saved buddy (omit slot for random) |
-| `/buddy save [slot]` | Save current buddy to a named slot |
-| `/buddy list` | List all saved buddies |
-| `/buddy dismiss <slot>` | Remove a saved buddy slot |
-| `/buddy pick` | Launch interactive TUI picker (`! bun run pick`) |
-| `/buddy frequency [seconds]` | Show or set comment cooldown |
-| `/buddy style [classic\|round]` | Bubble border style (tmux only) |
-| `/buddy position [top\|left]` | Bubble position (tmux only) |
-| `/buddy rarity [on\|off]` | Show or hide stars + rarity line (tmux only) |
-| `/buddy help` | Show all buddy commands |
+| Command                     | Description                         |
+| --------------------------- | ----------------------------------- |
+| `/buddy`                    | Show the current buddy card         |
+| `/buddy pet`                | Pet your companion                  |
+| `/buddy stats`              | Show detailed stats                 |
+| `/buddy pull`               | Spend coins to hatch a random buddy |
+| `/buddy wallet`             | Show coin balance and pity progress |
+| `/buddy gacha on/off`       | Toggle coin economy and pulls       |
+| `/buddy packs`              | Show currently available packs      |
+| `/buddy rename <name>`      | Rename current buddy                |
+| `/buddy personality <text>` | Set custom personality              |
+| `/buddy summon [slot]`      | Summon a saved buddy                |
+| `/buddy save [slot]`        | Save current buddy                  |
+| `/buddy list`               | List saved buddies                  |
+| `/buddy dismiss <slot>`     | Remove a saved buddy slot           |
+| `/buddy pick`               | Launch the interactive picker       |
+| `/buddy off` / `/buddy on`  | Mute or unmute reactions            |
+| `/buddy help`               | Show help                           |
 
 ### CLI
 
-| Command | Description |
-|---|---|
-| `bun run install-buddy` | Automated setup |
-| `bun run show` | Show buddy in terminal |
-| `bun run pick` | Interactive TUI to find and save your dream buddy |
-| `bun run hunt` | Legacy search (use `pick` instead) |
-| `bun run doctor` | Full diagnostic report |
-| `bun run verify` | Verify buddy generation matches expected output |
-| `bun run backup` | Snapshot / restore state |
-| `bun run settings` | View / change buddy settings — cooldown, TTL (TUI coming soon) |
-| `bun run disable` | Temporarily deactivate buddy |
-| `bun run enable` | Re-enable buddy |
-| `bun run help` | Full CLI reference |
-| `bun run cli/uninstall.ts` | Clean removal |
-
-<sub>💡 Want a global `claude-buddy` command? → `cd claude-buddy && bun link`</sub>
-
-### 🎯 Buddy Pick
-
-Want a specific species, rarity, or stat distribution?
-
-```bash
-bun run pick
-```
-
-Interactive TUI with saved buddies, criteria search, vim keys, and two-pane preview. Uses the exact same `wyhash + mulberry32` algorithm as Claude Code.
+| Command                       | Description                                                 |
+| ----------------------------- | ----------------------------------------------------------- | -------------------- |
+| `bun run install-buddy`       | Install MCP, skill, hooks, and status line                  |
+| `bun run show`                | Show current buddy in the terminal                          |
+| `bun run pick`                | Interactive picker and browser for saved/searchable buddies |
+| `bun run hunt`                | Legacy non-interactive search                               |
+| `bun run pull`                | Animated gacha pull flow                                    |
+| `bun run pull:claude`         | Pull using Claude for soul generation                       |
+| `bun run pull:codex`          | Pull using Codex for soul generation                        |
+| `bun run settings`            | Show current settings                                       |
+| `bun run settings host claude | codex`                                                      | Set the default host |
+| `bun run settings gacha on    | off`                                                        | Toggle gacha mode    |
+| `bun run doctor`              | Run diagnostics                                             |
+| `bun run backup`              | Backup or restore buddy state                               |
+| `bun run upgrade`             | Pull latest changes and reinstall                           |
+| `bun run uninstall`           | Remove the integration                                      |
 
 </details>
 
 ---
 
 <details>
-<summary><b>🔍 &nbsp; Diagnostic Tools</b></summary>
+<summary><b>🔍 &nbsp; Diagnostics and Troubleshooting</b></summary>
 
 <br>
-
-claude-buddy ships with built-in diagnostics for debugging across terminals and platforms.
 
 ### `bun run doctor`
-Complete diagnostic — environment, terminal info, state, settings, padding test, live status line output. **Always run this first when filing a bug report.**
+
+Use this first when something looks wrong. It collects environment info, state/config, and status line diagnostics.
 
 ### `bun run test-statusline`
-Temporarily replaces your status line with a multi-line diagnostic. Shows padding strategies side-by-side, color support, Unicode handling.
 
-```bash
-bun run test-statusline          # install test
-# restart Claude Code, screenshot
-bun run test-statusline restore  # restore buddy
-```
+Temporarily replaces the buddy status line with a diagnostic view so rendering problems are easier to debug.
 
-### `bun run backup`
-Snapshot all claude-buddy state to a timestamped backup. Use before experiments.
+### Common issues
 
-```bash
-bun run backup              # create snapshot
-bun run backup list         # list snapshots
-bun run backup restore      # restore latest
-bun run backup restore <ts> # restore specific
-```
+- Buddy not appearing after install:
+    - restart Claude Code completely
+    - make sure `bun` and `jq` are on `PATH`
+    - confirm the MCP entry and status line config were installed into the expected profile
+- Comments not showing:
+    - the buddy instructions are loaded at session start, so restart Claude Code after install or upgrade
+- Art alignment looks off:
+    - run `bun run doctor`
+    - then `bun run test-statusline`
 
 </details>
 
 ---
 
-<details>
-<summary><b>🐛 &nbsp; Troubleshooting</b></summary>
+## Roadmap
 
-<br>
+- [x] Multi-buddy menagerie
+- [x] Gacha mode, wallet, pity, and achievements
+- [x] Pack-based species architecture
+- [x] LLM-generated buddy souls for pulls
+- [x] Initial host setting for future multi-host support
+- [ ] Broader Codex CLI support beyond soul generation
+- [ ] More packs and community-contributed species
+- [ ] Leveling, memory, and mood systems
+- [ ] One-command install flow without cloning
 
-### Buddy not appearing in status line
+## Fork Notes
 
-1. Run `bun run doctor` — does the script work directly?
-2. Restart Claude Code completely — `instructions` are loaded once at session start
-3. Check `~/.claude/settings.json` has the `statusLine` block
-4. Make sure `bun` and `jq` are in `$PATH`
+If you are looking for the original project and or just restore the claude code buddy experience only, start with:
 
-### Buddy comments not showing
+- Upstream: [1270011/claude-buddy](https://github.com/1270011/claude-buddy)
 
-The buddy comment mechanism uses an MCP server `instructions` field that Claude only reads at **session start**. If you installed claude-buddy in an existing session, restart Claude Code.
+If you want the more experimental branch of the idea with packs, pulls, and expanding host support, this fork is that branch.
 
-```bash
-jq '.mcpServers["claude-buddy"]' ~/.claude.json
-```
+## Contributing
 
-### Buddy art looks broken or misaligned
+Issues and PRs are welcome:
 
-Known MVP issue on some terminal/platform combos — different terminals render Braille Pattern Blank (U+2800) at different widths.
+- Bugs and rendering fixes
+- New species and pack ideas
+- Better reactions and personality prompting
+- Claude Code and Codex portability work
 
-To help us fix it:
-1. Run `bun run doctor` and paste output in a [new issue](https://github.com/1270011/claude-buddy/issues/new)
-2. Run `bun run test-statusline` and screenshot the result
-3. Then `bun run test-statusline restore`
+Open an issue or PR on [Luminous9/code-buddy](https://github.com/Luminous9/code-buddy).
 
-### Recovery from a broken state
+## Credits
 
-```bash
-bun run backup restore      # restore latest backup
-bun run cli/uninstall.ts    # full clean removal
-```
-
-</details>
-
----
-
-<details>
-<summary><b>📋 &nbsp; Requirements</b></summary>
-
-<br>
-
-| Requirement | Install |
-|---|---|
-| **[Bun](https://bun.sh)** | `curl -fsSL https://bun.sh/install \| bash` |
-| **Claude Code** v2.1.80+ | Any version with MCP support |
-| **jq** | `apt install jq` / `brew install jq` / [`windows: download and add 'jq.exe' from jqlang/jq to path`](https://github.com/jqlang/jq/releases/latest)|
-
-> **Will I get the same buddy I had?** Yes. claude-buddy uses the exact same algorithm as the original (`wyhash + mulberry32`, same salt, same identity resolution). If your `~/.claude.json` still has your `accountUuid`, you'll get the identical species, rarity, stats, and cosmetics.
-
-</details>
-
-<br>
-
----
-
-## 🗺️ Roadmap
-
-- [x] **Multi-buddy support** — menagerie system with named slots, interactive TUI picker 💜[@doctor-ew](https://github.com/doctor-ew)💜
-- [ ] **Leveling system** — XP from coding sessions, unlockable reactions and upgrades
-- [ ] **Buddy pair-programming** — active help during sessions, pattern detection
-- [ ] **Cross-session memory** — remembers past projects and earlier conversations
-- [ ] **Mood system** — shifts based on code quality, tests, time of day
-- [x] **Achievement badges** — "1000 lines reviewed", "week streak", etc. 💜[ndcorder](https://github.com/ndcorder)💜
-- [ ] **Light theme colors** — auto-detect and match light theme RGB
-- [ ] **New species + community art** — submit your own designs
-- [ ] **`npx claude-buddy`** — one-command install without cloning
-
-<br>
-
----
-
-## 💜 Contributors
-
-Thank you to everyone who helped bring buddies back to life.
-
-<a href="https://github.com/1270011/claude-buddy/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=1270011/claude-buddy" alt="Contributors" />
-</a>
-
-<sub>Automatically generated from the [contributors graph](https://github.com/1270011/claude-buddy/graphs/contributors) via [contrib.rocks](https://contrib.rocks).</sub>
-
-<br>
-
-Want to help? New species, better reactions, bugfixes, wild new features — [PRs welcome](https://github.com/1270011/claude-buddy/pulls).
-
-<br>
-
----
-
-## 🙏 Credits
-
-- Original buddy concept by **Anthropic** (Claude Code v2.1.89 — v2.1.94)
-- Inspired by [any-buddy](https://github.com/cpaczek/any-buddy), [buddy-reroll](https://github.com/grayashh/buddy-reroll), [ccbuddyy](https://github.com/vibenalytics/ccbuddyy)
+- Original buddy concept by Anthropic
+- Original restore project by [1270011/claude-buddy](https://github.com/1270011/claude-buddy)
+- Inspired by [any-buddy](https://github.com/cpaczek/any-buddy), [buddy-reroll](https://github.com/grayashh/buddy-reroll), and [ccbuddyy](https://github.com/vibenalytics/ccbuddyy)
 - Built with the [Model Context Protocol](https://modelcontextprotocol.io)
-
-<br>
-
----
 
 <div align="center">
 
-### 📜 License
+### License
 
-MIT — do whatever you want, just don't take my buddy away again.
-
-<br>
-
-<sub><b>Keywords:</b> claude code buddy · claude code companion · claude code pet · terminal pet · coding companion · tamagotchi · MCP companion · /buddy command · claude buddy removed · bring back buddy · ASCII art pet</sub>
+MIT
 
 </div>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy doctor — comprehensive diagnostic report
+ * code-buddy doctor — comprehensive diagnostic report
  *
  * Run: bun run doctor
  *
@@ -12,11 +12,14 @@ import { readFileSync, existsSync, statSync } from "fs";
 import { execSync } from "child_process";
 import { join, resolve, dirname } from "path";
 import {
+  APP_NAME,
   buddyStateDir,
   claudeConfigDir,
   claudeSettingsPath,
   claudeSkillDir,
   claudeUserConfigPath,
+  MCP_SERVER_NAME,
+  MCP_SERVER_NAMES,
 } from "../server/path.ts";
 
 const PROJECT_ROOT = resolve(dirname(import.meta.dir));
@@ -68,7 +71,7 @@ function tryParseJson(text: string | null): any | null {
 
 console.log(`${CYAN}${BOLD}
 ╔══════════════════════════════════════════════════════════╗
-║  claude-buddy doctor — diagnostic report                 ║
+║  code-buddy doctor — diagnostic report                   ║
 ╚══════════════════════════════════════════════════════════╝${NC}`);
 
 console.log(`\n${DIM}Copy this entire output into your GitHub issue.${NC}`);
@@ -108,9 +111,9 @@ row(`${STATE_DIR} exists`, existsSync(STATE_DIR) ? "yes" : "no");
 row("Project root", PROJECT_ROOT);
 row("Status script exists", existsSync(STATUS_SCRIPT) ? "yes" : `${RED}no${NC}`);
 
-// ─── claude-buddy state ─────────────────────────────────────────────────────
+// ─── code-buddy state ───────────────────────────────────────────────────────
 
-section("claude-buddy state");
+section("code-buddy state");
 const menagerie = tryParseJson(tryRead(join(STATE_DIR, "menagerie.json")));
 const status = tryParseJson(tryRead(join(STATE_DIR, "status.json")));
 
@@ -163,11 +166,12 @@ if (settings?.hooks) {
   warn("No hooks configured");
 }
 
-if (claudeJson?.mcpServers?.["claude-buddy"]) {
+const registeredMcpName = MCP_SERVER_NAMES.find(name => claudeJson?.mcpServers?.[name]);
+if (registeredMcpName) {
   ok(`MCP server registered in ${CLAUDE_JSON}`);
-  console.log(`    ${JSON.stringify(claudeJson.mcpServers["claude-buddy"], null, 2).split("\n").join("\n    ")}`);
+  console.log(`    ${JSON.stringify(claudeJson.mcpServers[registeredMcpName], null, 2).split("\n").join("\n    ")}`);
 } else {
-  err(`MCP server NOT registered in ${CLAUDE_JSON}`);
+  err(`MCP server "${MCP_SERVER_NAME}" NOT registered in ${CLAUDE_JSON}`);
 }
 
 const skillPath = join(SKILL_DIR, "SKILL.md");

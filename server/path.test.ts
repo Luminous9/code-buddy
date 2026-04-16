@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { homedir } from "os";
 import { join } from "path";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 
 import {
@@ -22,10 +22,13 @@ import {
 } from "./path.ts";
 
 const origConfigDir = process.env.CLAUDE_CONFIG_DIR;
+const origHome = process.env.HOME;
 
 function restoreEnv() {
   if (origConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
   else process.env.CLAUDE_CONFIG_DIR = origConfigDir;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
 }
 
 describe("claudeConfigDir", () => {
@@ -67,7 +70,7 @@ describe("claudeUserConfigPath", () => {
   let profileDir: string;
 
   beforeEach(() => {
-    profileDir = mkdtempSync(join(tmpdir(), "claude-buddy-paths-"));
+    profileDir = mkdtempSync(join(tmpdir(), "code-buddy-paths-"));
   });
 
   afterEach(() => {
@@ -104,8 +107,20 @@ describe("buddyStateDir", () => {
     expect(buddyStateDir()).toBe("/tmp/profile/buddy-state");
   });
 
-  test("default is ~/.claude-buddy when CLAUDE_CONFIG_DIR is unset", () => {
+  test("default is ~/.code-buddy when CLAUDE_CONFIG_DIR is unset and no legacy dir exists", () => {
     delete process.env.CLAUDE_CONFIG_DIR;
-    expect(buddyStateDir()).toBe(join(homedir(), ".claude-buddy"));
+    const home = mkdtempSync(join(tmpdir(), "code-buddy-home-"));
+    process.env.HOME = home;
+    expect(buddyStateDir()).toBe(join(home, ".code-buddy"));
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  test("falls back to ~/.claude-buddy for legacy installs when no new dir exists", () => {
+    delete process.env.CLAUDE_CONFIG_DIR;
+    const home = mkdtempSync(join(tmpdir(), "code-buddy-home-"));
+    process.env.HOME = home;
+    mkdirSync(join(home, ".claude-buddy"), { recursive: true });
+    expect(buddyStateDir()).toBe(join(home, ".claude-buddy"));
+    rmSync(home, { recursive: true, force: true });
   });
 });

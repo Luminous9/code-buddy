@@ -23,7 +23,7 @@ describe("cleanupPluginState", () => {
   beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), "buddy-uninstall-test-"));
     settingsPath = join(root, "settings.json");
-    stateDir = join(root, ".claude-buddy");
+    stateDir = join(root, ".code-buddy");
     mkdirSync(stateDir, { recursive: true });
   });
 

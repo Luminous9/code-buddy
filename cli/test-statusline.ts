@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * claude-buddy test-statusline — temporarily install a test status line
+ * code-buddy test-statusline — temporarily install a test status line
  *
  * Run: bun run test-statusline           # install test
  *      bun run test-statusline restore   # restore original
@@ -39,7 +39,7 @@ const action = process.argv[2] || "install";
 // ─── Install ────────────────────────────────────────────────────────────────
 
 if (action === "install") {
-  console.log(`\n${BOLD}claude-buddy test status line installer${NC}\n`);
+  console.log(`\n${BOLD}code-buddy test status line installer${NC}\n`);
 
   if (!existsSync(SETTINGS)) {
     err(`${SETTINGS} not found`);
@@ -99,7 +99,7 @@ ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━�
 // ─── Restore ────────────────────────────────────────────────────────────────
 
 if (action === "restore") {
-  console.log(`\n${BOLD}claude-buddy test status line restore${NC}\n`);
+  console.log(`\n${BOLD}code-buddy test status line restore${NC}\n`);
 
   if (!existsSync(BACKUP)) {
     err(`No backup found at ${BACKUP}`);

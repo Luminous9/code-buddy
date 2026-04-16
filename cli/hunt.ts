@@ -1,5 +1,5 @@
 /**
- * claude-buddy hunt — brute-force search for a specific buddy
+ * code-buddy hunt — brute-force search for a specific buddy
  *
  * Rules:
  *   - Asks for a name before saving
@@ -53,7 +53,7 @@ async function main() {
   }
   console.log(`
 ${CYAN}╔══════════════════════════════════════════════════════════╗${NC}
-${CYAN}║${NC}  ${BOLD}claude-buddy hunt${NC} — find your perfect companion          ${CYAN}║${NC}
+${CYAN}║${NC}  ${BOLD}code-buddy hunt${NC} — find your perfect companion            ${CYAN}║${NC}
 ${CYAN}╚══════════════════════════════════════════════════════════╝${NC}
 `);
 

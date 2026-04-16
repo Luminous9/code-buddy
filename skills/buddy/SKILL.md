@@ -7,7 +7,7 @@ allowed-tools: mcp__claude_buddy__*
 
 # Buddy — Your Coding Companion
 
-Handle the user's `/buddy` command using the claude-buddy MCP tools.
+Handle the user's `/buddy` command using the code-buddy MCP tools.
 
 ## Command Routing
 
@@ -29,7 +29,7 @@ Based on `$ARGUMENTS`:
 | `save [slot]`            | Call `buddy_save` with optional slot name                                                    |
 | `list`                   | Call `buddy_list`                                                                            |
 | `dismiss <slot>`         | Call `buddy_dismiss` with the slot name                                                      |
-| `pick`                   | Tell user to run `! bun run pick` from the claude-buddy directory (launches interactive TUI) |
+| `pick`                   | Tell user to run `! bun run pick` from the code-buddy directory (launches interactive TUI) |
 | `frequency`              | Call `buddy_frequency` with no args (show current)                                           |
 | `frequency <seconds>`    | Call `buddy_frequency` with cooldown=seconds                                                 |
 | `style`                  | Call `buddy_style` with no args (show current)                                               |
@@ -64,10 +64,10 @@ If the user mentions the buddy's name in normal conversation, call `buddy_react`
 When the user invokes `/buddy uninstall`, run this sequence **in order** — do not skip steps, do not ask for confirmation between steps:
 
 1. Call the MCP tool `buddy_uninstall`. Display its output verbatim.
-2. Run via Bash tool: `claude plugin uninstall claude-buddy@claude-buddy`
-3. Run via Bash tool: `claude plugin marketplace remove claude-buddy`
-4. Run via Bash tool: `rm -rf ~/.claude/plugins/cache/claude-buddy`
-5. Tell the user: uninstall is complete; companion data is kept at `~/.claude-buddy/`; restart Claude Code to release the plugin.
+2. Run via Bash tool: `claude plugin uninstall code-buddy@code-buddy`
+3. Run via Bash tool: `claude plugin marketplace remove code-buddy`
+4. Run via Bash tool: `rm -rf ~/.claude/plugins/cache/code-buddy`
+5. Tell the user: uninstall is complete; companion data is kept at `~/.code-buddy/` or the legacy `~/.claude-buddy/`; restart Claude Code to release the plugin.
 
 If any Bash step fails (non-zero exit), report the error but continue with the remaining steps — each step is independent and always-safe to run.
 

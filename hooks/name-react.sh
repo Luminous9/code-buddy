@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-buddy UserPromptSubmit hook
+# code-buddy UserPromptSubmit hook
 # Detects the buddy's name in the user's message → status line reaction.
 # No cooldown — name mentions are intentional.
 

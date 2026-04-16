@@ -1,10 +1,10 @@
 {
-  "name": "claude-buddy",
+  "name": "code-buddy",
   "version": "0.3.0",
   "description": "Permanent coding companion for Claude Code — survives any update (MVP)",
   "type": "module",
   "bin": {
-    "claude-buddy": "./cli/index.ts"
+    "code-buddy": "./cli/index.ts"
   },
   "scripts": {
     "server": "bun run server/index.ts",
@@ -54,9 +54,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/1270011/claude-buddy.git"
+    "url": "https://github.com/Luminous9/code-buddy.git"
   },
-  "homepage": "https://github.com/1270011/claude-buddy#readme",
+  "homepage": "https://github.com/Luminous9/code-buddy#readme",
   "license": "MIT",
   "dependencies": {
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",

@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { homedir, tmpdir } from "os";
 import { join, resolve } from "path";
 
@@ -46,28 +46,29 @@ printf 'BUDDY_STATE_DIR=%s\\n' "$BUDDY_STATE_DIR"`;
 }
 
 describe("scripts/paths.sh (CLAUDE_CONFIG_DIR unset)", () => {
-  const env = sourcePaths({ CLAUDE_CONFIG_DIR: null });
+  const home = mkdtempSync(join(tmpdir(), "code-buddy-sh-home-"));
+  const env = sourcePaths({ CLAUDE_CONFIG_DIR: null, HOME: home });
 
   test("CLAUDE_CFG_DIR defaults to $HOME/.claude", () => {
-    expect(env.CLAUDE_CFG_DIR).toBe(join(homedir(), ".claude"));
+    expect(env.CLAUDE_CFG_DIR).toBe(join(home, ".claude"));
   });
 
   test("CLAUDE_SETTINGS_FILE points under the config dir", () => {
-    expect(env.CLAUDE_SETTINGS_FILE).toBe(join(homedir(), ".claude", "settings.json"));
+    expect(env.CLAUDE_SETTINGS_FILE).toBe(join(home, ".claude", "settings.json"));
   });
 
   test("CLAUDE_USER_CONFIG is $HOME/.claude.json", () => {
-    expect(env.CLAUDE_USER_CONFIG).toBe(join(homedir(), ".claude.json"));
+    expect(env.CLAUDE_USER_CONFIG).toBe(join(home, ".claude.json"));
   });
 
-  test("BUDDY_STATE_DIR defaults to $HOME/.claude-buddy", () => {
-    expect(env.BUDDY_STATE_DIR).toBe(join(homedir(), ".claude-buddy"));
+  test("BUDDY_STATE_DIR defaults to $HOME/.code-buddy when no legacy dir exists", () => {
+    expect(env.BUDDY_STATE_DIR).toBe(join(home, ".code-buddy"));
   });
 });
 
 describe("scripts/paths.sh (CLAUDE_CONFIG_DIR set)", () => {
   test("all paths live under $CLAUDE_CONFIG_DIR", () => {
-    const profile = mkdtempSync(join(tmpdir(), "claude-buddy-sh-"));
+    const profile = mkdtempSync(join(tmpdir(), "code-buddy-sh-"));
     try {
       const env = sourcePaths({ CLAUDE_CONFIG_DIR: profile });
       expect(env.CLAUDE_CFG_DIR).toBe(profile);
@@ -79,7 +80,7 @@ describe("scripts/paths.sh (CLAUDE_CONFIG_DIR set)", () => {
   });
 
   test("CLAUDE_USER_CONFIG prefers $CLAUDE_CONFIG_DIR/.claude.json when present", () => {
-    const profile = mkdtempSync(join(tmpdir(), "claude-buddy-sh-"));
+    const profile = mkdtempSync(join(tmpdir(), "code-buddy-sh-"));
     try {
       writeFileSync(join(profile, ".claude.json"), "{}");
       const env = sourcePaths({ CLAUDE_CONFIG_DIR: profile });
@@ -90,7 +91,7 @@ describe("scripts/paths.sh (CLAUDE_CONFIG_DIR set)", () => {
   });
 
   test("CLAUDE_USER_CONFIG points at the profile even when only $HOME/.claude.json exists (no cross-profile leak)", () => {
-    const profile = mkdtempSync(join(tmpdir(), "claude-buddy-sh-"));
+    const profile = mkdtempSync(join(tmpdir(), "code-buddy-sh-"));
     // HOME is a real dir where $HOME/.claude.json probably exists on the
     // test runner. The resolver MUST NOT fall back to it — otherwise
     // enabling buddy in a profile could mutate the home-level file.
@@ -100,5 +101,21 @@ describe("scripts/paths.sh (CLAUDE_CONFIG_DIR set)", () => {
     } finally {
       rmSync(profile, { recursive: true, force: true });
     }
+  });
+});
+
+describe("scripts/paths.sh legacy fallback", () => {
+  test("falls back to $HOME/.claude-buddy when it exists and .code-buddy does not", () => {
+    const home = mkdtempSync(join(tmpdir(), "code-buddy-sh-home-"));
+    try {
+      const legacy = join(home, ".claude-buddy");
+      mkdirSync(legacy, { recursive: true });
+      const env = sourcePaths({ CLAUDE_CONFIG_DIR: null, HOME: home });
+      expect(env.BUDDY_STATE_DIR).toBe(legacy);
+    } catch {
+      rmSync(home, { recursive: true, force: true });
+      throw new Error("legacy fallback setup failed");
+    }
+    rmSync(home, { recursive: true, force: true });
   });
 });

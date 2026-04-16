@@ -1,14 +1,16 @@
 /**
- * claude-buddy uninstall — remove all integrations
+ * code-buddy uninstall — remove all integrations
  */
 
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync } from "fs";
 import { join } from "path";
 import {
+  APP_NAME,
   buddyStateDir,
   claudeSettingsPath,
   claudeSkillDir,
   claudeUserConfigPath,
+  MCP_SERVER_NAMES,
 } from "../server/path.ts";
 
 const GREEN = "\x1b[32m";
@@ -23,7 +25,7 @@ const SKILL_DIR = claudeSkillDir("buddy");
 const STATE_DIR = buddyStateDir();
 const CLAUDE_JSON_PATH = claudeUserConfigPath();
 
-console.log("\nclaude-buddy uninstall\n");
+console.log(`\n${APP_NAME} uninstall\n`);
 
 // Stop all popup reopen loops and close any running popup
 try {
@@ -55,9 +57,15 @@ try {
 // Remove MCP server from Claude's user config
 try {
   const claudeJson = JSON.parse(readFileSync(CLAUDE_JSON_PATH, "utf8"));
-  if (claudeJson.mcpServers?.["claude-buddy"]) {
-    delete claudeJson.mcpServers["claude-buddy"];
-    if (Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
+  let removed = false;
+  for (const name of MCP_SERVER_NAMES) {
+    if (claudeJson.mcpServers?.[name]) {
+      delete claudeJson.mcpServers[name];
+      removed = true;
+    }
+  }
+  if (removed) {
+    if (claudeJson.mcpServers && Object.keys(claudeJson.mcpServers).length === 0) delete claudeJson.mcpServers;
     writeFileSync(CLAUDE_JSON_PATH, JSON.stringify(claudeJson, null, 2));
     ok(`MCP server removed from ${CLAUDE_JSON_PATH}`);
   }
@@ -80,7 +88,8 @@ try {
     if (settings.hooks?.[hookType]) {
       const before = settings.hooks[hookType].length;
       settings.hooks[hookType] = settings.hooks[hookType].filter(
-        (h: any) => !h.hooks?.some((hh: any) => hh.command?.includes("claude-buddy")),
+        (h: any) => !h.hooks?.some((hh: any) =>
+          hh.command?.includes("code-buddy") || hh.command?.includes("claude-buddy")),
       );
       if (settings.hooks[hookType].length < before) {
         ok(`${hookType} hooks removed`);

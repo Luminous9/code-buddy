@@ -230,7 +230,7 @@ describe("generatePersonalityPrompt", () => {
     // The "don't repeat yourself" instruction
     expect(prompt).toContain("distinct");
     // Stats come before inspiration words
-    const statsIdx = lines.findIndex((l) => l.startsWith("Stats:"));
+    const statsIdx = lines.findIndex((l) => l.startsWith("All Stats:"));
     const vibesIdx = lines.findIndex((l) => l.startsWith("Inspiration words:"));
     expect(statsIdx).toBeGreaterThan(-1);
     expect(vibesIdx).toBeGreaterThan(statsIdx);

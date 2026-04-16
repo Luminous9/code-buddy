@@ -2,7 +2,8 @@
  * State management — reads/writes companion data to the buddy state dir.
  *
  * The state dir resolves via server/paths.ts (honors CLAUDE_CONFIG_DIR).
- * Default: ~/.claude-buddy/. With CLAUDE_CONFIG_DIR set:
+ * Default: ~/.code-buddy/ with legacy fallback to ~/.claude-buddy/. With
+ * CLAUDE_CONFIG_DIR set:
  * $CLAUDE_CONFIG_DIR/buddy-state/.
  *
  * Storage layout (v3 — single manifest):
@@ -493,7 +494,7 @@ const TRANSIENT_PREFIXES = [
  * Clean up plugin-owned writes to the user's global state so that
  * `claude plugin uninstall` leaves no orphaned entries behind. Specifically:
  *   - remove settings.statusLine if it points to buddy-status.sh
- *   - delete session-scoped transient files under ~/.claude-buddy/
+ *   - delete session-scoped transient files under the buddy state dir
  *
  * Companion data (menagerie.json, status.json, config.json) is intentionally
  * kept — users reinstalling get their buddy back. Call-sites that want a full

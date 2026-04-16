@@ -1,4 +1,4 @@
-# Contributing to claude-buddy
+# Contributing to code-buddy
 
 Thanks for wanting to help bring buddies back to life!
 
@@ -8,8 +8,8 @@ you need: setup, DCO sign-off, tests, and what happens when you open a PR.
 ## Quick Setup
 
 ```bash
-git clone https://github.com/1270011/claude-buddy.git
-cd claude-buddy
+git clone https://github.com/Luminous9/code-buddy.git
+cd code-buddy
 bun install
 bun run install-buddy
 ```
@@ -18,13 +18,16 @@ Restart Claude Code and type `/buddy` to verify everything works.
 
 ## Project Structure
 
-| Directory | What it does |
-|-----------|-------------|
-| `server/` | MCP server -- buddy engine, tools, state, reactions |
-| `skills/` | `/buddy` slash command (SKILL.md) |
-| `hooks/` | Shell scripts for error detection + comment extraction |
-| `statusline/` | Animated buddy display (Claude Code status line) |
-| `cli/` | Install, uninstall, show, hunt, verify commands |
+| Directory       | What it does                                                                |
+| --------------- | --------------------------------------------------------------------------- |
+| `server/`       | MCP server, buddy engine, state, wallet, pull logic, reactions              |
+| `server/packs/` | Source of truth for pack/species art, faces, and species-specific reactions |
+| `skills/`       | `/buddy` slash command (SKILL.md)                                           |
+| `hooks/`        | Shell scripts for error detection + comment extraction                      |
+| `statusline/`   | Animated buddy display (Claude Code status line)                            |
+| `cli/`          | Install, uninstall, show, pick, pull, settings, verify, diagnostics         |
+| `scripts/`      | Species import/generation helpers and export utilities                      |
+| `species-dev/`  | Markdown design templates for new species before import                     |
 
 ## Before opening a PR — quick checklist
 
@@ -34,28 +37,81 @@ Restart Claude Code and type `/buddy` to verify everything works.
 - [ ] Commit messages are in English and prefixed (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`)
 - [ ] Branch pushed to your fork, PR opened against `main`
 - [ ] CI is green on the PR
+- [ ] You understand that PRs are maintainer-reviewed before merge and are not self-merged by contributors
 
 If any of these feel unclear, the sections below explain them step by step.
 
 ## How to Contribute
 
 ### Bug Fixes
+
 1. Open an issue describing the bug
 2. Fork the repo and create a branch (`fix/description`)
 3. Fix it, test it locally
 4. Open a PR
 
 ### New Features
+
 1. Open an issue first to discuss the idea
 2. Fork and branch (`feat/description`)
-3. Keep it simple — this is an MVP, small PRs are better than big ones
+3. Keep the scope tight — small, reviewable PRs are better than broad refactors
 4. Open a PR
 
 ### New Species Art
-Species art lives in `server/art.ts` and `statusline/buddy-status.sh`. Each species has 3 animation frames of 4-5 lines, ~12 chars wide. Use `{E}` as the eye placeholder.
+
+Species art now lives in pack files under `server/packs/*.ts`, not directly in `server/art.ts`.
+
+Recommended workflow:
+
+1. Create a template:
+
+```bash
+bun run new-species <name>
+```
+
+2. Fill out the generated markdown file in `species-dev/`.
+
+3. Import it into an existing pack or a new pack:
+
+```bash
+bun run import-species species-dev/<name>-design.md
+```
+
+The import tool will:
+
+- add the species to the selected pack in `server/packs/`
+- create a new pack file if you chose `pack: new`
+- regenerate shell art via `bun run gen-shell-art`
+- export reactions for shell consumers via `bun run export-reactions`
+
+Current art conventions:
+
+- 3 animation frames
+- 5 lines per frame
+- line 1 is the hat slot
+- use `{E}` for eye placeholders
+- pad lines with spaces to keep widths stable
+
+If you are editing a species by hand instead of using the template flow, the pack file is still the source of truth. Generated shell output should be refreshed afterward with:
+
+```bash
+bun run gen-shell-art
+bun run export-reactions
+```
 
 ### New Reactions
-Reaction templates are in `server/reactions.ts`. Species-specific reactions go in `SPECIES_REACTIONS`, general ones in `REACTIONS`.
+
+Generic reaction pools live in `server/reactions.ts`.
+
+Species-specific reactions now live alongside each species definition inside `server/packs/*.ts`, under that species's `reactions` field.
+
+In practice:
+
+- edit `server/reactions.ts` when you want to change shared/default reaction tone
+- edit `server/packs/*.ts` when you want a species to have custom flavor
+- run `bun run export-reactions` after reaction changes if you are touching shell-consumed reaction data directly
+
+If you are adding a new species through the template/import flow, species-specific reactions can be written directly in the design template and the import step will carry them into the pack for you.
 
 ## DCO (Developer Certificate of Origin)
 
@@ -145,6 +201,11 @@ Tests live next to the code they cover:
 - `server/state.test.ts` — pure helper tests (`slugify`)
 - `server/reactions.test.ts` — reactions, fallback names, and personality
   prompt (`getReaction`, `generateFallbackName`, `generatePersonalityPrompt`)
+- `server/pull.test.ts` — gacha pull odds, pity logic, and hatch flavor text
+- `server/wallet.test.ts` — wallet state and pull affordability
+- `server/achievements.test.ts` — achievement thresholds and slot/global event behavior
+- `server/path.test.ts` / `server/paths_sh.test.ts` — config/state path resolution
+- `server/manifest.test.ts` / `server/uninstall.test.ts` — plugin manifest and cleanup regressions
 
 ### Adding new tests
 
@@ -157,16 +218,16 @@ Use the built-in [`bun:test`](https://bun.sh/docs/cli/test) runner
 needed:
 
 ```ts
-import { describe, test, expect } from "bun:test";
-import { mulberry32 } from "./engine.ts";
+import { describe, test, expect } from "bun:test"
+import { mulberry32 } from "./engine.ts"
 
 describe("mulberry32", () => {
-  test("is deterministic", () => {
-    const a = mulberry32(42);
-    const b = mulberry32(42);
-    expect(a()).toBe(b());
-  });
-});
+    test("is deterministic", () => {
+        const a = mulberry32(42)
+        const b = mulberry32(42)
+        expect(a()).toBe(b())
+    })
+})
 ```
 
 ## What happens when you open a PR
@@ -174,13 +235,23 @@ describe("mulberry32", () => {
 When you push a branch and open a PR against `main`, two checks run
 automatically:
 
-| Check | What it verifies |
-|-------|------------------|
+| Check                 | What it verifies                                              |
+| --------------------- | ------------------------------------------------------------- |
 | **Test (Bun latest)** | Runs `bun test` on Ubuntu with the latest Bun. Must be green. |
-| **DCO** | Verifies every commit has a `Signed-off-by:` line. |
+| **DCO**               | Verifies every commit has a `Signed-off-by:` line.            |
 
-Both are **required** — branch protection blocks the merge button until
-they are green.
+Both are required, and the repo also uses a maintainer-review merge flow.
+
+### Current merge policy
+
+Pull requests into `main` are expected to be reviewed by the project maintainer before merge.
+
+In practice, that means a healthy PR usually looks like:
+
+1. Open the PR against `main`.
+2. Wait for CI to finish.
+3. Address review feedback if any.
+4. Wait for maintainer approval / merge.
 
 If a check fails:
 
@@ -200,6 +271,15 @@ bun run cli/verify.ts
 # Show current buddy
 bun run show
 
+# Check current settings / host / gacha mode
+bun run settings
+
+# Try the gacha flow
+bun run pull
+
+# Preview a species template before import
+bun run preview-species species-dev/<name>-design.md
+
 # Test MCP server
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | bun server/index.ts
 
@@ -213,20 +293,21 @@ echo '{}' | ./statusline/buddy-status.sh
 - Bash for hooks and status line (keep it POSIX-friendly where possible)
 - No unnecessary dependencies
 - If it can be simple, keep it simple
+- Pack files in `server/packs/` are the canonical home for species art, face templates, hat offsets, and species-specific reactions
 
 ### Commit messages
 
 - Written in **English**
 - Short subject line (50-72 characters), prefixed with the change type:
-  - `feat:` — a new user-visible feature
-  - `fix:` — a bug fix
-  - `chore:` — housekeeping (deps, repo config, no behavior change)
-  - `docs:` — documentation only
-  - `refactor:` — code restructure without behavior change
-  - `test:` — adding or updating tests
-  - `ci:` — CI / workflow changes
-- Body (optional) explains the **why**, not the *what* — the diff already
-  shows the *what*
+    - `feat:` — a new user-visible feature
+    - `fix:` — a bug fix
+    - `chore:` — housekeeping (deps, repo config, no behavior change)
+    - `docs:` — documentation only
+    - `refactor:` — code restructure without behavior change
+    - `test:` — adding or updating tests
+    - `ci:` — CI / workflow changes
+- Body (optional) explains the **why**, not the _what_ — the diff already
+  shows the _what_
 - Always signed off (see the DCO section above)
 
 Example:
